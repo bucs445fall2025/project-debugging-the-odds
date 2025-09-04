@@ -19,4 +19,8 @@ if ( app.Environment.IsDevelopment() ) {
 
 app.MapGet( "/", () => "Hello World!" );
 
+app.MapPost( "/authentication/sign/up", () => "" );
+app.MapPost( "/authentication/sign/in", () => "" );
+app.MapGet( "/authentication/validate/jwt", () => "" );
+
 app.Run();
