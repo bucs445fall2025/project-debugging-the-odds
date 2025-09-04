@@ -21,6 +21,7 @@ app.MapGet( "/", () => "Hello World!" );
 
 app.MapPost( "/authentication/sign/up", () => "" );
 app.MapPost( "/authentication/sign/in", () => "" );
-app.MapGet( "/authentication/validate/jwt", () => "" );
+app.MapGet( "/authentication/jwt/validate", () => "" );
+app.MapGet( "/authentication/jwt/sign", () => "" );
 
 app.Run();
