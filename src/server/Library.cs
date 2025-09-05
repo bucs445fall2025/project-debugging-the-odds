@@ -33,4 +33,11 @@ X: `*88888%`     ! 8888.+""      4888>        8888  8888   888E  9888      8888.
     ");
     }
   }
+
+
+  public static class HelperMethods { // name subject to change stoned rn not wasting brain power
+    public static void get_user( ) {
+
+    }
+  }
 }
