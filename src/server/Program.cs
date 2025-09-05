@@ -1,4 +1,7 @@
 using Microsoft.OpenApi.Models;
+using Library;
+
+Startup.print_startup_message();
 
 var builder = WebApplication.CreateBuilder( args );
 
