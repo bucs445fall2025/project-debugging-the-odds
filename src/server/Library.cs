@@ -2,7 +2,7 @@ namespace Library {
   public static class Startup {
     public static void print_startup_message() {
       Console.WriteLine(@"
-               ...     ..                                    s                               .                              
+      ...     ..                                    s                               .                              
   .=*8888x <""?88h.                                :8                              @88>                            
  X>  '8888H> '8888                  .u    .      .88                  .u    .     %8P      u.    u.               
 '88h. `8888   8888         u      .d88B :@8c    :888ooo      .u     .d88B :@8c     .     x@88k u@88c.      uL     
@@ -36,8 +36,10 @@ X: `*88888%`     ! 8888.+""      4888>        8888  8888   888E  9888      8888.
 
 
   public static class HelperMethods { // name subject to change stoned rn not wasting brain power
-    public static void get_user( ) {
-
+    public static void get_user( string email ) {
+      using var database = new Database();
+      var user = database.Users.First( user => user.Email == email );
+      return user;
     }
   }
 }
