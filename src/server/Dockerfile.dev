@@ -1,0 +1,17 @@
+# ./server/Dockerfile.dev
+
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS dev
+WORKDIR /app
+
+# Copy project files
+COPY . .
+
+# Restore dependencies
+RUN dotnet restore
+
+# Expose HTTP port
+EXPOSE 80
+
+# Start app using dotnet run
+CMD [ "dotnet", "run", "--urls=http://0.0.0.0:80" ]
+

@@ -16,14 +16,14 @@ services:
   backend:
     build:
       context: ./server
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     depends_on:
       - database
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      ConnectionStrings__DefaultConnection: Host=db;Port=5432;Username=barter_user;Password=barter_password;Database=barter
+      ConnectionStrings__DefaultConnection: Host=database;Port=5432;Username=barter_user;Password=barter_password;Database=barter
     ports:
-      - "5432:5432"
+      - "5172:80"
     restart: unless-stopped
 
   frontend:
