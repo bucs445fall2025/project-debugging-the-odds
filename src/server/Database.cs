@@ -1,10 +1,10 @@
-namespace Database {
+namespace BarterDatabase {
   using Microsoft.EntityFrameworkCore;
   
   // users table schema
   public class User {
-    public string ID { get; set; }
-    public string Email { get; set; }
+    public required string ID { get; set; }
+    public required string Email { get; set; }
   }
 
   public class Database : DbContext {

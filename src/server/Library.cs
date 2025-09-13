@@ -1,3 +1,5 @@
+using BarterDatabase;
+
 namespace Library {
   public static class Startup {
     public static void print_startup_message() {
@@ -39,7 +41,7 @@ X: `*88888%`     ! 8888.+""      4888>        8888  8888   888E  9888      8888.
     public static void get_user( string email ) {
       using var database = new Database();
       var user = database.Users.First( user => user.Email == email );
-      return user;
+      //return user;
     }
   }
 }
