@@ -1,10 +1,11 @@
 # << Project Title >>
 ## CS 445 Final Project
-### << Semester, Year >>
+Fall 2025
 
 ### Team: << team name >>
-<< List Team Members >>
-
+Richard Zielenski
+Xavier Wallis
+Daniel Beiser
 ## Getting Started
 <<One paragraph of project description goes here>>
 
