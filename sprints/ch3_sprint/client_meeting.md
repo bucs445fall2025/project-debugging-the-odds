@@ -6,9 +6,11 @@
 
 ## Requirements Attempted in next Sprint
 
+- Autentication on backend
 
 ## Milestone Status (Pass/Fail)
 
+Pass
 
 ## Requested Changes
 
