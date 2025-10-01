@@ -32,6 +32,8 @@ services:
       dockerfile: Dockerfile.dev
     ports:
       - "5173:5173"
+    volumes:
+      - ./view/:/app/view
     restart: unless-stopped
 
 volumes:
