@@ -44,7 +44,7 @@ X: `*88888%`     ! 8888.+""      4888>        8888  8888   888E  9888      8888.
   public static class JWTMethods { // name subject to change stoned rn not wasting brain power
 
     public static string GenerateJwt( Guid userId ) {
-      var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("supersecretkey123"));
+      var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("supersecretkey123THISWILLBECHANGEDLATER"));
       var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
       var token = new JwtSecurityToken(
@@ -57,7 +57,7 @@ X: `*88888%`     ! 8888.+""      4888>        8888  8888   888E  9888      8888.
     }
 
     public static ClaimsPrincipal ValidateJwt( string token ) {
-      var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("supersecretkey123"));
+      var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("supersecretkey123THISWILLBECHANGEDLATER"));
       var parameters = new TokenValidationParameters
         {
           ValidateIssuer = false,
