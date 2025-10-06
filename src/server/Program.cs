@@ -32,63 +32,62 @@ if ( app.Environment.IsDevelopment() ) {
 
 app.MapGet( "/", () => "Hello World!" );
 
-app.MapGet( "debug/dump/users", async ( [FromServices] Database database ) =>
-{
-    var users = await database.Users.ToListAsync();
-    return Results.Json( users );
+app.MapGet( "debug/dump/users", async ( [FromServices] Database database ) => {
+  var users = await database.Users.ToListAsync();
+  return Results.Json( users );
 });
 
-app.MapPost( "/authentication/sign/up", async ( [FromServices] Database database, SignUpRequest request ) =>
-{
-    if ( await database.Users.AnyAsync( user => user.Email == request.Email ) )
-        return Results.BadRequest("Email already registered.");
-
-    // Hash password
-    var salt = Convert.ToBase64String( RandomNumberGenerator.GetBytes( 16 ) );
-    var hash = Convert.ToBase64String(
-        SHA256.HashData( Encoding.UTF8.GetBytes( request.Password + salt ) )
-    );
-
-    var user = new User { ID = Guid.NewGuid(), Email = request.Email, PasswordSalt = salt, PasswordHash = hash };
-    database.Users.Add( user );
-    await database.SaveChangesAsync();
-
-    return Results.Ok("Account created.");
+app.MapPost( "debug/delete/user", async ( [FromServices] Database database, DeleteUserRequest request ) => {
+  var user = await database.Users.SingleOrDefaultAsync( user => user.Email == request.Email );
+  if ( user is null ) return Results.BadRequest( "Invalid credentials." );
+  database.Users.Remove( user );
+  await database.SaveChangesAsync();
+  return Results.Ok( "Account Removed." );
 });
 
-app.MapPost( "/authentication/sign/in", async ( [FromServices] Database database, SignInRequest request ) =>
-{
-    var user = await database.Users.SingleOrDefaultAsync( user => user.Email == request.Email );
-    if ( user is null ) return Results.BadRequest("Invalid credentials.");
+app.MapPost( "/authentication/sign/up", async ( [FromServices] Database database, SignUpRequest request ) => {
+  if ( await database.Users.AnyAsync( user => user.Email == request.Email ) ) return Results.BadRequest("Email already registered.");
 
-    var hash = Convert.ToBase64String(
-        SHA256.HashData( Encoding.UTF8.GetBytes( request.Password + user.PasswordSalt ) )
-    );
+  // Hash password
+  // first generate per user salt and turn to url safe string
+  var salt = Convert.ToBase64String( RandomNumberGenerator.GetBytes( 16 ) );
+  // get bytes hash it and turn to url safe string
+  var hash = Convert.ToBase64String( SHA256.HashData( Encoding.UTF8.GetBytes( request.Password + salt ) ) );
 
-    if (hash != user.PasswordHash) return Results.BadRequest("Invalid credentials.");
+  var user = new User { ID = Guid.NewGuid(), Email = request.Email, PasswordSalt = salt, PasswordHash = hash };
+  database.Users.Add( user );
+  await database.SaveChangesAsync();
 
-    string token = Library.JWTMethods.GenerateJwt( user.ID );
-    return Results.Ok( new { token } );
+  return Results.Ok( "Account created." );
 });
 
-app.MapGet( "/authentication/jwt/validate", ( [FromQuery] string token ) =>
-{
-    try
-    {
-        var principal = ValidateJwt( token );
-        return Results.Ok( new { valid = true, user = principal.FindFirstValue( ClaimTypes.NameIdentifier ) } );
-    }
-    catch
-    {
-        return Results.BadRequest( new { valid = false } );
-    }
+app.MapPost( "/authentication/sign/in", async ( [FromServices] Database database, SignInRequest request ) => {
+  var user = await database.Users.SingleOrDefaultAsync( user => user.Email == request.Email );
+  if ( user is null ) return Results.BadRequest( "Invalid credentials." );
+
+  // get bytes of password and salt, hash it, and turn to url safe string
+  var hash = Convert.ToBase64String( SHA256.HashData( Encoding.UTF8.GetBytes( request.Password + user.PasswordSalt ) ) );
+
+  // compare both url strings no have to decode
+  if (hash != user.PasswordHash) return Results.BadRequest( "Invalid credentials." );
+
+  string token = Library.JWTMethods.GenerateJwt( user.ID );
+  return Results.Ok( new { token } );
+});
+
+app.MapGet( "/authentication/jwt/validate", ( [FromQuery] string token ) => {
+  try {
+    var principal = Library.JWTMethods.ValidateJwt( token );
+    return Results.Ok( new { valid = true, user = principal.FindFirstValue( ClaimTypes.NameIdentifier ) } );
+  } catch {
+    return Results.BadRequest( new { valid = false } );
+  }
 });
 
 // GET /authentication/jwt/sign
-app.MapGet( "/authentication/jwt/sign", ( [FromQuery] Guid userId ) =>
-{
-    string token = GenerateJwt( userId );
-    return Results.Ok( new { token } );
+app.MapGet( "/authentication/jwt/sign", ( [FromQuery] Guid userId ) => {
+  string token = Library.JWTMethods.GenerateJwt( userId );
+  return Results.Ok( new { token } );
 });
 
 app.Run();
