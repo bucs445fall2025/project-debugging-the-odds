@@ -49,5 +49,5 @@ Security - Making secrets difficult to crack
 
 ## Team Work Assignments
 Daniel Beiser - Design and implement login gui
-Richard Zielenski - Setup database schema in c#
+Richard Zielenski - Setup OAuth
 Xavier Wallis - Creating back end routes for authentication
