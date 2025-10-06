@@ -16,9 +16,9 @@ Precautions
 Accounts: Authentication
 
 ## Completed Requirements
+Authentication
 
 ### Incomplete Requirements
-Authentication
 
 ### The summary of the entire project
 
