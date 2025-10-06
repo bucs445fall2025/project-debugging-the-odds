@@ -1,4 +1,9 @@
 using BarterDatabase;
+using System.Security.Claims;
+using System.Text;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+
 
 namespace Library {
   public static class Startup {
@@ -36,8 +41,35 @@ X: `*88888%`     ! 8888.+""      4888>        8888  8888   888E  9888      8888.
     }
   }
 
+  public static class JWTMethods { // name subject to change stoned rn not wasting brain power
 
-  public static class HelperMethods { // name subject to change stoned rn not wasting brain power
+    public static string GenerateJwt( Guid userId ) {
+      var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("supersecretkey123"));
+      var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+      var token = new JwtSecurityToken(
+        claims: new[] { new Claim(ClaimTypes.NameIdentifier, userId.ToString()) },
+        expires: DateTime.UtcNow.AddHours(1),
+        signingCredentials: creds
+      );
+
+      return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    public static ClaimsPrincipal ValidateJwt( string token ) {
+      var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("supersecretkey123"));
+      var parameters = new TokenValidationParameters
+        {
+          ValidateIssuer = false,
+          ValidateAudience = false,
+          IssuerSigningKey = key,
+          ValidateLifetime = true
+        };
+      return new JwtSecurityTokenHandler().ValidateToken(token, parameters, out _);
+    }
+  }
+
+  public static class DatabaseMethods { // name subject to change stoned rn not wasting brain power
     public static void get_user( string email ) {
       using var database = new Database();
       var user = database.Users.First( user => user.Email == email );
