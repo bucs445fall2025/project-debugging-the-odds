@@ -1,33 +1,60 @@
 namespace BarterDatabase {
-  using Microsoft.EntityFrameworkCore;
-  
-  // users table schema
-  public class User {
-    public required Guid ID { get; set; } = Guid.NewGuid();
-    public required string Email { get; set; }
-    public string? Name { get; set; }
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    using Microsoft.EntityFrameworkCore;
 
-    // Username/Password Authentication
-    public string? PasswordSalt { get; set; }                // Null if not using password auth
-    public string? PasswordHash { get; set; }
+    // users table schema
+    public class User {
+        public required Guid ID { get; set; } = Guid.NewGuid();
+        public required string Email { get; set; }
+        public string? Name { get; set; }
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
-    // OAuth Authentication
-    public string? OAuthProvider { get; set; }               // e.g. "google", "microsoft", "facebook"
-  }
+        // Username/Password Authentication
+        public string? PasswordSalt { get; set; }
+        public string? PasswordHash { get; set; }
 
-  public class Database : DbContext {
-    public DbSet<User> Users => Set<User>();
+        // OAuth Authentication
+        public string? OAuthProvider { get; set; }
 
-    protected override void OnConfiguring( DbContextOptionsBuilder options_builder ) {
-      options_builder.UseNpgsql( "database-url" );
+        // Navigation
+        public List<Item> Items { get; set; } = new();
     }
 
-    protected override void OnModelCreating( ModelBuilder model_builder ) {
-      model_builder.Entity<User>()
-        .HasIndex( user => user.Email )
-        .IsUnique();
+    // items table schema
+    public class Item {
+        public required Guid ID { get; set; } = Guid.NewGuid();
+        public required string Name { get; set; }
+        public string? Description { get; set; }
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        public required Guid OwnerID { get; set; }
+        public User Owner { get; set; } = null!;
     }
-  }
+
+    public class Database : DbContext {
+        public DbSet<User> Users => Set<User>();
+        public DbSet<Item> Items => Set<Item>();
+
+        protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) {
+            // Use environment variable or config for dockerized connection
+            //var connectionString = Environment.GetEnvironmentVariable("POSTGRES_CONNECTION") 
+                                   //?? "Host=localhost;Port=5432;Database=barter;Username=barter_user;Password=barter_password";
+
+            var connection_string = "Host=database;Port=5432;Database=barter;Username=barter_user;Password=barter_password";
+            optionsBuilder.UseNpgsql(connection_string);
+        }
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder) {
+            modelBuilder.Entity<User>()
+                .HasIndex(u => u.Email)
+                .IsUnique();
+
+            modelBuilder.Entity<Item>()
+                .HasOne(i => i.Owner)
+                .WithMany(u => u.Items)
+                .HasForeignKey(i => i.OwnerID)
+                .OnDelete(DeleteBehavior.Cascade);
+        }
+    }
 }
+
