@@ -24,12 +24,16 @@ services:
       ConnectionStrings__DefaultConnection: Host=database;Port=5432;Username=barter_user;Password=barter_password;Database=barter
     ports:
       - "5172:80"
+    networks:
+      - barter-network
     restart: unless-stopped
 
   frontend:
     build:
       context: ./view
       dockerfile: Dockerfile.dev
+    network:
+      - barter-network
     ports:
       - "5173:5173"
     volumes:
@@ -38,4 +42,6 @@ services:
 
 volumes:
   data:
+networks:
+  - barter-network
 
