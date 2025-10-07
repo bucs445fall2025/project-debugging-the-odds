@@ -9,6 +9,7 @@ services:
     ports:
       - "5433:5432"
     networks:
+      - barter-network
     volumes:
       - data:/var/lib/postgresql/data
       - ./database/database-initializers:/docker-entrypoint-initdb.d
