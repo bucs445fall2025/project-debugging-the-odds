@@ -1,10 +1,11 @@
-# << Project Title >>
+# Barter
 ## CS 445 Final Project
-### << Semester, Year >>
+Fall 2025
 
 ### Team: << team name >>
-<< List Team Members >>
-
+Richard Zielenski
+Xavier Wallis
+Daniel Beiser
 ## Getting Started
 <<One paragraph of project description goes here>>
 
@@ -18,7 +19,7 @@ A list of features, function or non-functional, you would like to add in the fut
   >>
   
 ## SRS
-[document](url to google doc)
+[document](https://docs.google.com/document/d/1Ze2wzSRsTHIAvvLaX8dBaRfaCN2LzP3OI3Igu8JR3yg/edit?usp=sharing)
   
 ### Prerequisites
 * [Docker](https://www.docker.com/)
