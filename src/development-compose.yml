@@ -37,14 +37,20 @@ services:
     build:
       context: ./view
       dockerfile: Dockerfile.dev
+    working_dir: /app
     networks:
       - barter-network
     ports:
       - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:5172
+      - CHOKIDAR_USEPOLLING=true     # helps Vite see changes on Windows/mac
+      - WATCHPACK_POLLING=true
     volumes:
-      - ./view/:/app/view
+      - ./view:/app                  # <-- mount source at /app (not /app/view)
+      - /app/node_modules            # <-- keep deps inside container (anonymous volume)
+    command: ["npm","run","dev","--","--host","0.0.0.0"]
     restart: unless-stopped
-
 volumes:
   data:
 networks:
