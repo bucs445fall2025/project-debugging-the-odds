@@ -1,5 +1,5 @@
 development:
-	docker compose --file development-compose.yml up
+	docker compose --file development-compose.yml up 
 no-cache:
 	docker compose --file development-compose.yml build --no-cache
 	docker compose --file development-compose.yml up
