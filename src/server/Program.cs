@@ -74,7 +74,7 @@ app.MapPost( "/authentication/sign/up", async ( [FromServices] Database database
   var salt = Convert.ToBase64String( RandomNumberGenerator.GetBytes( 16 ) );
   var hash = Convert.ToBase64String( SHA256.HashData( Encoding.UTF8.GetBytes( request.Password + salt ) ) );
 
-  var user = new User { ID = Guid.NewGuid(), Email = request.Email, PasswordSalt = salt, PasswordHash = hash, Name = request.Name };
+  var user = new User { ID = Guid.NewGuid(), Email = request.Email, PasswordSalt = salt, PasswordHash = hash};
   database.Users.Add( user );
   await database.SaveChangesAsync();
   return Results.Ok( "Account created." );
@@ -129,8 +129,6 @@ app.MapPost("/authentication/google", async (
         {
             ID = Guid.NewGuid(),
             Email = email,
-            // Optional if you added it:
-            // GoogleSubject = sub
         };
         database.Users.Add(user);
         await database.SaveChangesAsync();
@@ -197,17 +195,13 @@ app.MapGet( "/authentication/jwt/sign", ( [FromQuery] Guid userId ) => {
 });
 
 
-// ------------------------------------------------------------
-//api/auth/* aliases so frontend can call relative `/api/...`
-// ------------------------------------------------------------
-
 app.MapPost("/api/auth/signup", async ([FromServices] Database database, SignUpRequest request) =>
 {
     // Reuse same logic as /authentication/sign/up
     if ( await database.Users.AnyAsync( user => user.Email == request.Email ) ) return Results.BadRequest("Email already registered.");
     var salt = Convert.ToBase64String( RandomNumberGenerator.GetBytes( 16 ) );
     var hash = Convert.ToBase64String( SHA256.HashData( Encoding.UTF8.GetBytes( request.Password + salt ) ) );
-    var user = new User { ID = Guid.NewGuid(), Email = request.Email, PasswordSalt = salt, PasswordHash = hash, Name = request.Name };
+    var user = new User { ID = Guid.NewGuid(), Email = request.Email, PasswordSalt = salt, PasswordHash = hash };
     database.Users.Add( user );
     await database.SaveChangesAsync();
     return Results.Ok( "Account created." );
