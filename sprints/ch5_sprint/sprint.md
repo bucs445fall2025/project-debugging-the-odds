@@ -35,7 +35,6 @@ The purpose of this application is to give users the ability to trade (barter) r
 
 ### Requirement Target
 Connecting backend to login page
-Email Verification
 Begin design of trading floor
 
 ### User Stories

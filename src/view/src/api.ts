@@ -33,7 +33,7 @@ function post<T = unknown>(path: string, body: Json): Promise<T> {
 
 export function signinNow(email: string, password: string) {
   // POST /api/auth/signin -> { token }
-  return post<{ token: string }>('/api/auth/signin', { email, password });
+  return post<{ token: string }>('/authentication/sign/in', { email, password });
 }
 
 export function signupNow(email: string, password: string) {
