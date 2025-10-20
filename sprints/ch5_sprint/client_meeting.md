@@ -22,7 +22,8 @@
 
 ## Requirements Attempted in next Sprint
 
-- Connecting backend to login page Email Verification Begin design of trading floor
+- Connecting backend to login page
+- Begin design of trading floor
 
 ## Milestone Status
 
