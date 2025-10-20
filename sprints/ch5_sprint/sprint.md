@@ -44,12 +44,10 @@ Trader
 
 ### Planning
 Call the backend api from react components
-Use resend to make users verify email
 Design layout and vibe
 
 ### Action Items
 Implement the code in react
-Implement resend service in backend
 Design
 
 ### Issues and Risks
@@ -57,5 +55,4 @@ Environment variables not being the same - creating a file to synchronize the en
 
 ## Team Work Assignments
 Daniel Beiser - Design of trading floor
-Richard Zielenski - Resend
-Xavier Wallis - Connecting backend to login page
+Richard Zielenski, Xavier Wallis - Connecting backend to login page

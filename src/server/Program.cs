@@ -82,10 +82,10 @@ app.MapPost( "/authentication/sign/up", async ( [FromServices] Database database
 
 app.MapPost( "/authentication/sign/in", async ( [FromServices] Database database, SignInRequest request ) => {
   var user = await database.Users.SingleOrDefaultAsync( user => user.Email == request.Email );
-  if ( user is null ) return Results.BadRequest( "Invalid credentials." );
+  if ( user is null ) return Results.BadRequest( "Invalid credentials user doesn't exist." );
 
   var hash = Convert.ToBase64String( SHA256.HashData( Encoding.UTF8.GetBytes( request.Password + user.PasswordSalt ) ) );
-  if (hash != user.PasswordHash) return Results.BadRequest( "Invalid credentials." );
+  if (hash != user.PasswordHash) return Results.BadRequest( "Invalid credentials hash." );
 
   string token = Library.JWTMethods.GenerateJwt( user.ID );
   return Results.Ok( new { token } );
