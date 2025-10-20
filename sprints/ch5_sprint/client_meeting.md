@@ -5,9 +5,13 @@
 
 ## Requirements Attempted in this Sprint
 
+- Sign-in page design
+- Sign-in with providers
 
 ## Requirements complete
 
+- Sign-in page design
+- Sign-in with providers
 
 ## Requirements incomplete
 
@@ -18,9 +22,11 @@
 
 ## Requirements Attempted in next Sprint
 
+- Connecting backend to login page Email Verification Begin design of trading floor
 
 ## Milestone Status
 
+Pass
 
 ## Requested Changes
 
