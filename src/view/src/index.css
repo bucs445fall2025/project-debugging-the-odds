@@ -1,5 +1,5 @@
 html, body, #root {
   height: 100%;
-  margin: 0;
-  padding: 0;
+  overflow: hidden;  /* prevent scrolling showing past the shader */
+  background: #0b0907; /* fallback if WebGL is unavailable */
 }
