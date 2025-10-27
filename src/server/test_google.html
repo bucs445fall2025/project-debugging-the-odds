@@ -1,0 +1,21 @@
+<!doctype html>
+<html>
+  <body>
+    <h3>Google OAuth  test</h3>
+
+    <div id="g_id_onload"
+         data-client_id="966595444731-njjm662pmcvjnd36fl6nnooo6r47okg2.apps.googleusercontent.com"
+         data-callback="onGoogleSignIn">
+    </div>
+    <div class="g_id_signin" data-type="standard"></div>
+
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script>
+      function onGoogleSignIn(resp) {
+        console.log("ID_TOKEN:", resp.credential);
+        alert("Got ID token; open DevTools → Console and copy it.");
+      }
+    </script>
+  </body>
+</html>
+
