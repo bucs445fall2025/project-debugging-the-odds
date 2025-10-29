@@ -17,7 +17,7 @@ namespace BarterDatabase {
         public string? OAuthProvider { get; set; }
 
         // Navigation
-        public List<Item> Items { get; set; } = new();
+        public ICollection<Item> Items { get; set; } = new List<Item>();
     }
 
     // items table schema
@@ -28,7 +28,9 @@ namespace BarterDatabase {
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         public required Guid OwnerID { get; set; }
-        public User Owner { get; set; } = null!;
+        public User? Owner { get; set; } = null!;
+
+        public required Category Category { get; set; }
     }
 
     public class Database : DbContext {
@@ -48,6 +50,9 @@ namespace BarterDatabase {
             modelBuilder.Entity<User>()
                 .HasIndex(u => u.Email)
                 .IsUnique();
+
+            //modelBuilder.Entity<User>()
+            //   .HasCheckConstraint()
 
             modelBuilder.Entity<Item>()
                 .HasOne(i => i.Owner)
