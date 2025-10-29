@@ -1,4 +1,4 @@
-namespace BarterDatabase {
+namespace Library.Storage {
     using Microsoft.EntityFrameworkCore;
 
     public enum Category {
@@ -33,6 +33,9 @@ namespace BarterDatabase {
 
         // Navigation
         public ICollection<Item> Items { get; set; } = new List<Item>();
+
+        public double Rating { get; set; } = 5.0;
+        public Category? Seeking { get; set; }
     }
 
     // items table schema
@@ -52,19 +55,19 @@ namespace BarterDatabase {
 
     public class Image {
         public required Guid ID { get; set; } = Guid.NewGuid();
-        public string CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public required Guid ItemID { get; set; }
         public Item? Item { get; set; }
 
         public string Bucket { get; set; } = "barter";
-        public string Key { get; set; }
+        public required string Key { get; set; }
         public string MimeType { get; set; } = "image/png";
     }
 
     public class Database : DbContext {
         public DbSet<User> Users => Set<User>();
         public DbSet<Item> Items => Set<Item>();
-        public DbSet<Image> Images => set<Image>();
+        public DbSet<Image> Images => Set<Image>();
 
         protected override void OnConfiguring( DbContextOptionsBuilder optionsBuilder ) {
             // Use environment variable or config for dockerized connection
@@ -82,12 +85,13 @@ namespace BarterDatabase {
 
             // ensure either password or oauth but never neither
             modelBuilder.Entity<User>()
-                .HasCheckConstraint( "CHECK_User_AuthenticationFields",
-                    @"(
-                        (""PasswordHash"" IS NOT NULL AND ""PasswordSalt"" IS NOT NULL AND ""OAuthProvider"" IS NULL)
-                        OR
-                        (""PasswordHash"" IS NULL AND ""PasswordSalt"" IS NULL AND ""OAuthProvider"" IS NOT NULL)
-                    )" );
+              .ToTable(table => table.HasCheckConstraint(
+                "CHECK_User_AuthenticationFields",
+                @" ( (""PasswordHash"" IS NOT NULL AND ""PasswordSalt"" IS NOT NULL AND ""OAuthProvider"" IS NULL)
+                  OR
+                    (""PasswordHash"" IS NULL AND ""PasswordSalt"" IS NULL AND ""OAuthProvider"" IS NOT NULL)
+                )"
+            ));
 
             modelBuilder.Entity<Item>()
                 .HasOne( item => item.Owner )

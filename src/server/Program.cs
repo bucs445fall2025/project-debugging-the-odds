@@ -1,7 +1,6 @@
 using Microsoft.OpenApi.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using BarterDatabase;
 using System.Security.Cryptography;
 using System.Text;
 using System.Security.Claims;
@@ -12,6 +11,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Net.Http.Json;
 using Resend;
 using Library;
+using Library.Storage;
 using static Library.JWTMethods;
 
 //NEW: allow Vite dev (5173) to call the API
@@ -28,25 +28,31 @@ builder.Services.AddSwaggerGen( context => {
 });
 
 // DB context as you had it
-builder.Services.AddDbContext<BarterDatabase.Database>();
+builder.Services.AddDbContext<Library.Storage.Database>();
 
 //register CORS (dev origin)
-builder.Services.AddCors(o =>
-{
-    o.AddPolicy(CorsPolicy, p =>
-        p.WithOrigins("http://localhost:5173")
+builder.Services.AddCors( origin => {
+    origin.AddPolicy( CorsPolicy, policy =>
+        policy.WithOrigins("http://localhost:5173")
          .AllowAnyHeader()
          .AllowAnyMethod()
          .AllowCredentials()
     );
 });
 
+builder.Services.AddSingleton( new Library.Storage.Seaweed(
+    "http://seaweed:8333",
+    "barter_access",
+    "barter_secret",
+    "barter"
+));
+
 var app = builder.Build();
 
 // enabling swagger for development environment only
 if ( app.Environment.IsDevelopment() ) {
    app.UseSwagger();
-   app.UseSwaggerUI( context => { context.SwaggerEndpoint("/swagger/v1/swagger.json", "Bartering API V1"); } );
+   app.UseSwaggerUI( context => { context.SwaggerEndpoint( "/swagger/v1/swagger.json", "Bartering API V1" ); } );
 }
 
 //enable CORS before endpoints
@@ -91,100 +97,72 @@ app.MapPost( "/authentication/sign/in", async ( [FromServices] Database database
   return Results.Ok( new { token } );
 });
 
-app.MapPost("/authentication/google", async (
-    [FromServices] Database database,
-    [FromServices] IConfiguration config,
-    HttpRequest http
-) =>
-{
-    var payloadJson = await JsonSerializer.DeserializeAsync<JsonElement>(http.Body);
-    if (!payloadJson.TryGetProperty("idToken", out var idTokenEl))
-        return Results.BadRequest("Missing idToken.");
-    var idToken = idTokenEl.GetString();
-    if (string.IsNullOrWhiteSpace(idToken))
-        return Results.BadRequest("Missing idToken.");
+// google oauthentication
+app.MapPost( "/authentication/google", async ( [FromServices] Database database, [FromServices] IConfiguration config, HttpRequest http ) => {
+    var json_payload = await JsonSerializer.DeserializeAsync<JsonElement>( http.Body );
+    if ( !json_payload.TryGetProperty( "idToken", out var id_token_element ) ) return Results.BadRequest( "Missing idToken." );
 
-    var settings = new GoogleJsonWebSignature.ValidationSettings
-    {
-        Audience = new[] { config["Google:ClientId"] }
-    };
+    var id_token = id_token_element.GetString();
+    if ( string.IsNullOrWhiteSpace( id_token ) ) return Results.BadRequest("Missing idToken.");
+
+    var settings = new GoogleJsonWebSignature.ValidationSettings { Audience = new[] { config["Google:ClientId"] } };
 
     GoogleJsonWebSignature.Payload google;
-    try
-    {
-        google = await GoogleJsonWebSignature.ValidateAsync(idToken!, settings);
+    try {
+        google = await GoogleJsonWebSignature.ValidateAsync( id_token!, settings );
     }
-    catch
-    {
-        return Results.BadRequest("Invalid Google token");
+    catch {
+        return Results.BadRequest( "Invalid Google token" );
     }
 
     var email = google.Email;
     var sub = google.Subject;
 
-    var user = await database.Users.SingleOrDefaultAsync(u => u.Email == email);
-    if (user is null)
-    {
-        user = new User
-        {
-            ID = Guid.NewGuid(),
-            Email = email,
-        };
-        database.Users.Add(user);
+    var user = await database.Users.SingleOrDefaultAsync( user => user.Email == email);
+    if ( user is null ) {
+        user = new User { ID = Guid.NewGuid(), Email = email };
+        database.Users.Add( user );
         await database.SaveChangesAsync();
     }
 
-    string token = Library.JWTMethods.GenerateJwt(user.ID);
-    return Results.Ok(new { token });
+    string token = Library.JWTMethods.GenerateJwt( user.ID );
+    return Results.Ok( new { token } );
 });
 
-app.MapPost("/authentication/apple", async (
-    [FromServices] Database database,
-    [FromServices] IConfiguration config,
-    HttpRequest http
-) =>
-{
-    var payloadJson = await JsonSerializer.DeserializeAsync<JsonElement>(http.Body);
-    if (!payloadJson.TryGetProperty("idToken", out var idTokenEl))
-        return Results.BadRequest("Missing idToken.");
-    var idToken = idTokenEl.GetString();
-    if (string.IsNullOrWhiteSpace(idToken))
-        return Results.BadRequest("Missing idToken.");
+// apple oauthentication
+app.MapPost( "/authentication/apple", async ( [FromServices] Database database, [FromServices] IConfiguration config, HttpRequest http ) => {
+    var json_payload = await JsonSerializer.DeserializeAsync<JsonElement>( http.Body );
+    if ( !json_payload.TryGetProperty( "idToken", out var id_token_element ) ) return Results.BadRequest( "Missing idToken." );
 
-    var expectedAudience = config["Apple:ClientId"];
-    if (string.IsNullOrWhiteSpace(expectedAudience))
-        return Results.BadRequest("Server missing Apple:ClientId configuration.");
+    var id_token = id_token_element.GetString();
+    if ( string.IsNullOrWhiteSpace( id_token ) ) return Results.BadRequest("Missing idToken.");
+
+
+    var expected_audience = config["Apple:ClientId"];
+    if ( string.IsNullOrWhiteSpace( expected_audience ) ) return Results.BadRequest("Server missing Apple:ClientId configuration.");
 
     JwtSecurityToken jwt;
-    try
-    {
-        jwt = await AppleJwtValidator.ValidateAsync(idToken!, expectedAudience);
+    try {
+        jwt = await AppleJwtValidator.ValidateAsync( id_token!, expected_audience );
     }
-    catch
-    {
+    catch {
         return Results.BadRequest("Invalid Apple token");
     }
 
     var sub = jwt.Subject; // stable Apple user id
-    var email = jwt.Payload.TryGetValue("email", out var e) ? e?.ToString() : null;
+    var email = jwt.Payload.TryGetValue( "email", out var apple_email ) ? apple_email?.ToString() : null;
 
-    if (string.IsNullOrWhiteSpace(email))
-        email = $"{sub}@apple.local";
+    if ( string.IsNullOrWhiteSpace( email ) ) email = $"{sub}@apple.local";
 
-    var user = await database.Users.SingleOrDefaultAsync(u => u.Email == email);
-    if (user is null)
-    {
-        user = new User
-        {
-            ID = Guid.NewGuid(),
-            Email = email,
-        };
-        database.Users.Add(user);
+    var user = await database.Users.SingleOrDefaultAsync( user => user.Email == email );
+    if ( user is null ) {
+        user = new User { ID = Guid.NewGuid(), Email = email };
+        database.Users.Add( user );
         await database.SaveChangesAsync();
     }
 
-    string token = Library.JWTMethods.GenerateJwt(user.ID);
-    return Results.Ok(new { token });
+    string token = Library.JWTMethods.GenerateJwt( user.ID );
+    return Results.Ok( new { token } );
 });
 
 
@@ -195,8 +173,7 @@ app.MapGet( "/authentication/jwt/sign", ( [FromQuery] Guid userId ) => {
 });
 
 
-app.MapPost("/api/auth/signup", async ([FromServices] Database database, SignUpRequest request) =>
-{
+app.MapPost( "/api/auth/signup", async ([FromServices] Database database, SignUpRequest request ) => {
     // Reuse same logic as /authentication/sign/up
     if ( await database.Users.AnyAsync( user => user.Email == request.Email ) ) return Results.BadRequest("Email already registered.");
     var salt = Convert.ToBase64String( RandomNumberGenerator.GetBytes( 16 ) );
@@ -207,8 +184,7 @@ app.MapPost("/api/auth/signup", async ([FromServices] Database database, SignUpR
     return Results.Ok( "Account created." );
 });
 
-app.MapPost("/api/auth/signin", async ([FromServices] Database database, SignInRequest request) =>
-{
+app.MapPost( "/api/auth/signin", async ([FromServices] Database database, SignInRequest request ) => {
     var user = await database.Users.SingleOrDefaultAsync( user => user.Email == request.Email );
     if ( user is null ) return Results.BadRequest( "Invalid credentials." );
     var hash = Convert.ToBase64String( SHA256.HashData( Encoding.UTF8.GetBytes( request.Password + user.PasswordSalt ) ) );
@@ -218,51 +194,3 @@ app.MapPost("/api/auth/signin", async ([FromServices] Database database, SignInR
 });
 
 app.Run();
-
-static class AppleJwtValidator
-{
-    private static readonly HttpClient _http = new HttpClient();
-    private static JsonWebKeySet? _jwks;
-    private static DateTimeOffset _fetchedAt;
-
-    public static async Task<JwtSecurityToken> ValidateAsync(string idToken, string expectedAudience)
-    {
-        var handler = new JwtSecurityTokenHandler();
-        if (!handler.CanReadToken(idToken))
-            throw new SecurityTokenException("Unreadable token");
-
-        // Refresh JWKS daily
-        if (_jwks is null || DateTimeOffset.UtcNow - _fetchedAt > TimeSpan.FromHours(24))
-        {
-            _jwks = await _http.GetFromJsonAsync<JsonWebKeySet>("https://appleid.apple.com/auth/keys")
-                    ?? throw new SecurityTokenException("Failed to load Apple JWKS");
-            _fetchedAt = DateTimeOffset.UtcNow;
-        }
-
-        var parms = new TokenValidationParameters
-        {
-            ValidIssuer = "https://appleid.apple.com",
-            ValidateIssuer = true,
-
-            ValidAudience = expectedAudience,
-            ValidateAudience = true,
-
-            IssuerSigningKeys = _jwks.Keys,
-            ValidateIssuerSigningKey = true,
-
-            RequireExpirationTime = true,
-            ValidateLifetime = true,
-            ClockSkew = TimeSpan.FromMinutes(3),
-        };
-
-        handler.ValidateToken(idToken, parms, out var validated);
-        var jwt = (JwtSecurityToken)validated;
-
-        // Apple uses RS256; reject anything else
-        if (!string.Equals(jwt.Header.Alg, SecurityAlgorithms.RsaSha256, StringComparison.Ordinal))
-            throw new SecurityTokenException("Unexpected alg");
-
-        return jwt;
-    }
-}
-

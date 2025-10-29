@@ -1,4 +1,4 @@
-using BarterDatabase;
+using Library.Storage;
 using System.Security.Claims;
 using System.Text;
 using Microsoft.IdentityModel.Tokens;
@@ -40,6 +40,49 @@ X: `*88888%`     ! 8888.+""      4888>        8888  8888   888E  9888      8888.
     ");
     }
   }
+
+
+  static class AppleJwtValidator {
+    private static readonly HttpClient http_client = new HttpClient();
+    private static JsonWebKeySet? jwks;
+    private static DateTimeOffset fetched_at;
+
+    public static async Task<JwtSecurityToken> ValidateAsync( string id_token, string expected_audience ) {
+        var handler = new JwtSecurityTokenHandler();
+        if ( !handler.CanReadToken( id_token ) ) throw new SecurityTokenException("Unreadable token");
+
+        // Refresh JWKS daily
+        if ( jwks is null || DateTimeOffset.UtcNow - fetched_at > TimeSpan.FromHours( 24 ) ) {
+            jwks = await http_client.GetFromJsonAsync<JsonWebKeySet>("https://appleid.apple.com/auth/keys")
+                    ?? throw new SecurityTokenException("Failed to load Apple JWKS");
+            fetched_at = DateTimeOffset.UtcNow;
+        }
+
+        var validation_parameters = new TokenValidationParameters {
+            ValidIssuer = "https://appleid.apple.com",
+            ValidateIssuer = true,
+
+            ValidAudience = expected_audience,
+            ValidateAudience = true,
+
+            IssuerSigningKeys = jwks.Keys,
+            ValidateIssuerSigningKey = true,
+
+            RequireExpirationTime = true,
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromMinutes(3),
+        };
+
+        handler.ValidateToken( id_token, validation_parameters, out var validated );
+        var jwt = ( JwtSecurityToken )validated;
+
+        // Apple uses RS256; reject anything else
+        if ( !string.Equals( jwt.Header.Alg, SecurityAlgorithms.RsaSha256, StringComparison.Ordinal ) ) throw new SecurityTokenException("Unexpected alg");
+
+        return jwt;
+    }
+  }
+
 
   public static class JWTMethods { // name subject to change stoned rn not wasting brain power
 
