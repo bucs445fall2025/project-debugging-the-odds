@@ -81,8 +81,11 @@ app.MapPost( "/authentication/sign/up", async ( [FromServices] Database database
   var hash = Convert.ToBase64String( SHA256.HashData( Encoding.UTF8.GetBytes( request.Password + salt ) ) );
 
   var user = new User { ID = Guid.NewGuid(), Email = request.Email, PasswordSalt = salt, PasswordHash = hash};
+
   database.Users.Add( user );
+
   await database.SaveChangesAsync();
+
   return Results.Ok( "Account created." );
 });
 
@@ -94,6 +97,7 @@ app.MapPost( "/authentication/sign/in", async ( [FromServices] Database database
   if (hash != user.PasswordHash) return Results.BadRequest( "Invalid credentials hash." );
 
   string token = Library.JWTMethods.GenerateJwt( user.ID );
+
   return Results.Ok( new { token } );
 });
 
@@ -172,25 +176,5 @@ app.MapGet( "/authentication/jwt/sign", ( [FromQuery] Guid userId ) => {
   return Results.Ok( new { token } );
 });
 
-
-app.MapPost( "/api/auth/signup", async ([FromServices] Database database, SignUpRequest request ) => {
-    // Reuse same logic as /authentication/sign/up
-    if ( await database.Users.AnyAsync( user => user.Email == request.Email ) ) return Results.BadRequest("Email already registered.");
-    var salt = Convert.ToBase64String( RandomNumberGenerator.GetBytes( 16 ) );
-    var hash = Convert.ToBase64String( SHA256.HashData( Encoding.UTF8.GetBytes( request.Password + salt ) ) );
-    var user = new User { ID = Guid.NewGuid(), Email = request.Email, PasswordSalt = salt, PasswordHash = hash };
-    database.Users.Add( user );
-    await database.SaveChangesAsync();
-    return Results.Ok( "Account created." );
-});
-
-app.MapPost( "/api/auth/signin", async ([FromServices] Database database, SignInRequest request ) => {
-    var user = await database.Users.SingleOrDefaultAsync( user => user.Email == request.Email );
-    if ( user is null ) return Results.BadRequest( "Invalid credentials." );
-    var hash = Convert.ToBase64String( SHA256.HashData( Encoding.UTF8.GetBytes( request.Password + user.PasswordSalt ) ) );
-    if (hash != user.PasswordHash) return Results.BadRequest( "Invalid credentials." );
-    string token = Library.JWTMethods.GenerateJwt( user.ID );
-    return Results.Ok( new { token } );
-});
 
 app.Run();

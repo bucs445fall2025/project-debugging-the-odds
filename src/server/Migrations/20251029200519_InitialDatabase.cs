@@ -40,7 +40,8 @@ namespace server.Migrations
                     PasswordSalt = table.Column<string>(type: "text", nullable: true),
                     PasswordHash = table.Column<string>(type: "text", nullable: true),
                     OAuthProvider = table.Column<string>(type: "text", nullable: true),
-                    Rating = table.Column<double>(type: "double precision", nullable: false)
+                    Rating = table.Column<double>(type: "double precision", nullable: false),
+                    Seeking = table.Column<int>(type: "integer", nullable: true)
                 },
                 constraints: table =>
                 {

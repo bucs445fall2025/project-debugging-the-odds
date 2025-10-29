@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace server.Migrations
 {
     [DbContext(typeof(Database))]
-    [Migration("20251029183859_InitialDatabase")]
+    [Migration("20251029200519_InitialDatabase")]
     partial class InitialDatabase
     {
         /// <inheritdoc />
@@ -118,6 +118,9 @@ namespace server.Migrations
 
                     b.Property<double>("Rating")
                         .HasColumnType("double precision");
+
+                    b.Property<int?>("Seeking")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
