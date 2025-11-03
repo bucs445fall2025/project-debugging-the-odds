@@ -2,10 +2,9 @@ import React, { useState } from 'react';
 import { Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import TiltedCard from './TiltedCard';
 import { isValidEmail } from '@/utils/validation';
+import { googleSignin } from '@/api';
 
-// If you place a PNG at: src/assets/google.png
 import googleLogo from '@/assets/google.png';
-// If instead you use /public/google.svg on web, replace the Image's source with: { uri: '/google.svg' }
 
 export default function LoginCard({
   cardW, cardH, onCreate, onSubmit, onForgot,
@@ -29,9 +28,41 @@ export default function LoginCard({
     onSubmit(email, password);
   };
 
-  const onGoogle = () => {
-    console.log('OAuth Google clicked');
-  };
+const onGoogle = async () => {
+  // Only for web
+  if (typeof window === 'undefined' || !(window as any).google) {
+    alert('Google Identity script not loaded — check index.html');
+    return;
+  }
+
+  const GOOGLE_CLIENT_ID = '966595444731-njjm662pmcvjnd36fl6nnooo6r47okg2.apps.googleusercontent.com'
+
+  try {
+    // Initialize the popup OAuth client
+    const client = (window as any).google.accounts.oauth2.initCodeClient({
+      client_id: GOOGLE_CLIENT_ID,
+      scope: 'openid email profile',
+      ux_mode: 'popup',
+      callback: async (tokenResponse: any) => {
+        try {
+          const idToken = tokenResponse?.credential || tokenResponse?.access_token;
+          if (!idToken) throw new Error('No credential returned from popup');
+          const res = await googleSignin(idToken); // backend validates token and sets session
+          localStorage.setItem('auth_token', res.token);
+          window.location.reload(); // reload to trigger session refresh in app
+        } catch (e) {
+          console.error('Google login failed:', e);
+          alert('Google login failed — see console for details.');
+        }
+      },
+    });
+
+    client.requestCode(); // <-- opens Google OAuth popup
+  } catch (err) {
+    console.error('Error initializing Google OAuth', err);
+    alert('Failed to start Google sign-in.');
+  }
+};
 
   return (
     <TiltedCard width={cardW} height={cardH}>

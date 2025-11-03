@@ -1,13 +1,16 @@
-// src/api.ts
-// Local dev only: talks to your backend on http://localhost:5172
 
+// src/api.ts
 const BASE = 'http://localhost:5172';
 
 type Json = Record<string, unknown>;
 
-async function request<T = unknown>(path: string, init: RequestInit): Promise<T> {
+async function request<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...(init.headers || {}) },
+    credentials: 'include', // <-- send/receive cookies
+    headers: {
+      ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(init.headers || {}),
+    },
     ...init,
   });
   if (!res.ok) {
@@ -18,7 +21,6 @@ async function request<T = unknown>(path: string, init: RequestInit): Promise<T>
   if (ct.includes('application/json')) {
     return (await res.json()) as T;
   }
-  // Allow non-JSON responses (e.g., plain success strings)
   // @ts-expect-error
   return undefined as T;
 }
@@ -27,16 +29,22 @@ function post<T = unknown>(path: string, body: Json): Promise<T> {
   return request<T>(path, { method: 'POST', body: JSON.stringify(body) });
 }
 
-// -----------------------------
-// Auth API (matches Program.cs /api/auth/* aliases)
-// -----------------------------
-
 export function signinNow(email: string, password: string) {
-  // POST /api/auth/signin -> { token }
+  // returns { token }
   return post<{ token: string }>('/authentication/sign/in', { email, password });
 }
 
 export function signupNow(email: string, password: string) {
-  // POST /api/auth/signup -> "Account created." or { id?: string }
-  return post<{ id?: string } | string>('/api/auth/signup', { email, password });
+  return post<{ token: string }>('/authentication/sign/up', { email, password });
 }
+
+// Called on page load to auto-login via session -> returns fresh JWT if session valid
+export function checkSession() {
+  return request<{ token: string; email: string }>('/authentication/check-session', { method: 'GET' });
+}
+
+// Google OAuth: send ID token to backend
+export function googleSignin(idToken: string) {
+  return post<{ token: string }>('/authentication/google', { idToken });
+}
+
