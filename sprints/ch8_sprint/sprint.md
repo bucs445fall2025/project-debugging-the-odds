@@ -13,11 +13,13 @@ DATE: 11/02/25
 - Make code environment variable friendly
 - CRUD on items
 - Continue design of trading floor and add Oauth buttons
+- Connecting sessions with front end
 
 ## Completed Requirements
 - Make code environment variable friendly
 - Add user Context and session handling
 - Continue design of trading floor and add Oauth buttons
+- Connecting sessions with front end
 
 ### Incomplete Requirements
 
@@ -33,28 +35,27 @@ DATE: 11/02/25
 ## Technical Debt
 
 ### Requirement Target
-- Connect Sessions with front end
-- Test and complete database code
-- Create trading floor home screen implemetation
+- Plan out trading process
+- Connect users and items
+- Continue trading floor home screen implemetation
+  
 ### User Stories
-- Authentication
 - Trader
-- Precautions
 
 ### Planning
-- Call new session code from front end
-- Fix database entry persistence issue
-- Start implementing existing design in react
+- Get a step by step process of trading figured out
+- allow users to add items
+- Continue implementing existing design in react
 
 ### Action Items
-- Code react sign in with sessions
-- Test and debug our database code and docker setup 
+- Write psuedo code for how a trade gets handled
+- Alter database to hold users items with fast lookup 
 - Write homepage in react
 
 ### Issues and Risks
-- Database problem could be a pain because we already tried debugging once
+- Database schema might need to be altered more than we think
 
 ## Team Work Assignments
 - Daniel Beiser - Implemetation of homepage
-- Richard Zielenski - User Context connection to frontend
-- Xavier Wallis - Fix database entry problem
+- Richard Zielenski - Connect users to items
+- Xavier Wallis - Trading process
