@@ -121,6 +121,17 @@ app.MapPatch( "update/item", async ( [FromServices] Database database, UpdateIte
   return Results.Ok( item );
 });
 
+app.MapGet( "get/items/by/owner", async ( [FromServices] Database database, GetItemByOwnerRequest request ) => {
+  var items = await database.Items.Where( item => item.OwnerID == request.OwnerID ).ToListAsync();
+  return Results.Ok( items );
+});
+
+app.MapGet( "get/item/by/id", async ( [FromServices] Database database, GetItemByOwnerRequest request ) => {
+  var item = await database.Items.FindAsync( item => item.OwnerID == request.OwnerID );
+  if ( item is null ) return Results.NotFound( "Item not found." );
+  return Results.Ok( item );
+});
+
 app.MapPost( "/authentication/sign/up", async ( [FromServices] Database database, SignUpRequest request ) => {
   if ( await database.Users.AnyAsync( user => user.Email == request.Email ) ) return Results.BadRequest("Email already registered.");
 
