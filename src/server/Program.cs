@@ -126,7 +126,7 @@ app.MapGet( "get/items/by/owner", async ( [FromServices] Database database, GetI
   return Results.Ok( items );
 });
 
-app.MapGet( "get/item/by/id", async ( [FromServices] Database database, GetItemByOwnerRequest request ) => {
+app.MapGet( "get/item/by/id", async ( [FromServices] Database database, GetItemByIDRequest request ) => {
   var item = await database.Items.FindAsync( item => item.OwnerID == request.OwnerID );
   if ( item is null ) return Results.NotFound( "Item not found." );
   return Results.Ok( item );
