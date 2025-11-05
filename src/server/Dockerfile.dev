@@ -17,18 +17,6 @@ run dotnet tool install dotnet-ef --version 9.0.9
 # Expose HTTP port
 expose 80
 
-# Copy entrypoint script
-copy entry-point.sh .
-
-# Make entrypoint executable
-run chmod +x entry-point.sh
-
-# Expose HTTP port
-expose 80
-
-# Run entrypoint
-cmd ["./entry-point.sh"]
-
 # Start app using dotnet run
-# cmd [ "dotnet", "run", "--urls=http://0.0.0.0:80" ]
+cmd [ "dotnet", "run", "--urls=http://0.0.0.0:80" ]
 

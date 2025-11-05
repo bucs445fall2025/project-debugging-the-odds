@@ -9,10 +9,10 @@ using System.Text.Json;
 using System.IdentityModel.Tokens.Jwt;
 using Microsoft.IdentityModel.Tokens;
 using System.Net.Http.Json;
-using Resend;
 using Library;
 using Library.Storage;
 using static Library.JWTMethods;
+using System.Text.Json.Serialization;
 
 //NEW: allow Vite dev (5173) to call the API
 const string CorsPolicy = "BarterCors";
@@ -60,17 +60,65 @@ app.UseCors(CorsPolicy);
 
 app.MapGet( "/", () => "Hello World!" );
 
+// DEBUG ROUTES
 app.MapGet( "debug/dump/users", async ( [FromServices] Database database ) => {
+  if ( !app.Environment.IsDevelopment() ) return Results.BadRequest( "Forbidden." );
   var users = await database.Users.ToListAsync();
   return Results.Json( users );
 });
 
+app.MapGet( "debug/dump/items", async ( [FromServices] Database database ) => {
+  if ( !app.Environment.IsDevelopment() ) return Results.BadRequest( "Forbidden." );
+  var items = await database.Items.ToListAsync();
+  return Results.Json( items );
+});
+
 app.MapPost( "debug/delete/user", async ( [FromServices] Database database, DeleteUserRequest request ) => {
+  if ( !app.Environment.IsDevelopment() ) return Results.BadRequest( "Forbidden." );
   var user = await database.Users.SingleOrDefaultAsync( user => user.Email == request.Email );
   if ( user is null ) return Results.BadRequest( "Invalid credentials." );
   database.Users.Remove( user );
   await database.SaveChangesAsync();
   return Results.Ok( "Account Removed." );
+});
+
+app.MapPost( "debug/delete/item", async ( [FromServices] Database database, DeleteItemRequest request ) => {
+  if ( !app.Environment.IsDevelopment() ) return Results.BadRequest( "Forbidden." );
+  var item = await database.Items.SingleOrDefaultAsync( item => item.ID == request.ID );
+  if ( item is null ) return Results.BadRequest( "Invalid credentials." );
+  database.Items.Remove( item );
+  await database.SaveChangesAsync();
+  return Results.Ok( "Account Removed." );
+});
+
+app.MapPost( "create/item", async ( [FromServices] Database database, CreateItemRequest request ) => {
+  var item = new Item {
+    ID = Guid.NewGuid(),
+    OwnerID = request.OwnerID,
+    Name = request.Name,
+    Description = request.Description,
+    Category = request.Category,
+    Images = Array.Empty<Image>()
+  };
+
+  database.Items.Add( item );
+  await database.SaveChangesAsync();
+
+  return Results.Ok( item );
+});
+
+app.MapPatch( "update/item", async ( [FromServices] Database database, UpdateItemRequest request ) => {
+  var item = await database.Items.FindAsync( request.ID );
+  if ( item is null ) return Results.NotFound( "Item not found." );
+  
+  item.Name = request.Name;
+  item.Description = request.Description;
+  item.Category = request.Category;
+
+
+  database.Items.Update( item );
+  await database.SaveChangesAsync();
+  return Results.Ok( item );
 });
 
 app.MapPost( "/authentication/sign/up", async ( [FromServices] Database database, SignUpRequest request ) => {
@@ -80,7 +128,7 @@ app.MapPost( "/authentication/sign/up", async ( [FromServices] Database database
   var salt = Convert.ToBase64String( RandomNumberGenerator.GetBytes( 16 ) );
   var hash = Convert.ToBase64String( SHA256.HashData( Encoding.UTF8.GetBytes( request.Password + salt ) ) );
 
-  var user = new User { ID = Guid.NewGuid(), Email = request.Email, PasswordSalt = salt, PasswordHash = hash};
+  var user = new User { ID = Guid.NewGuid(), Email = request.Email, PasswordSalt = salt, PasswordHash = hash };
 
   database.Users.Add( user );
 

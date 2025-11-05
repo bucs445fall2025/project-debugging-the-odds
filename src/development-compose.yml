@@ -15,12 +15,34 @@ services:
       - ./database/database-initializers:/docker-entrypoint-initdb.d
     restart: unless-stopped
 
-  backend:
+  backend-migration:
     build:
       context: ./server
       dockerfile: Dockerfile.dev
     depends_on:
       - database
+    environment:
+      DB_HOST: database
+      DB_PORT: 5432
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: Host=database;Port=5432;Username=barter_user;Password=barter_password;Database=barter
+    volumes:
+      - ./server/Migrations:/app/Migrations
+    networks:
+      - barter-network
+
+    command: >
+      sh -c "dotnet ef database update --project ./server.csproj --startup-project ./server.csproj" 
+
+    restart: no
+
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile.dev
+    depends_on:
+      - backend-migration
+
     environment:
       ServerSecret: serversecret123CHANGETHISLATER
       DB_HOST: database
@@ -31,6 +53,8 @@ services:
       - "5172:80"
     networks:
       - barter-network
+    volumes:
+      - ./server/Migrations:/app/Migrations
     restart: unless-stopped
 
   frontend:

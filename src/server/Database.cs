@@ -35,7 +35,7 @@ namespace Library.Storage {
         public ICollection<Item> Items { get; set; } = new List<Item>();
 
         public double Rating { get; set; } = 5.0;
-        public Category? Seeking { get; set; }
+        public Category? Seeking { get; set; } = null;
     }
 
     // items table schema
