@@ -91,6 +91,8 @@ app.MapPost( "debug/delete/item", async ( [FromServices] Database database, Dele
   return Results.Ok( "Account Removed." );
 });
 
+// Item Routes
+
 app.MapPost( "create/item", async ( [FromServices] Database database, CreateItemRequest request ) => {
   var item = new Item {
     ID = Guid.NewGuid(),
@@ -131,6 +133,8 @@ app.MapGet( "get/item/by/id/{ID:guid}", async ( [FromServices] Database database
   if ( item is null ) return Results.NotFound( "Item not found." );
   return Results.Ok( item );
 });
+
+// Authentication Routes
 
 app.MapPost( "/authentication/sign/up", async ( [FromServices] Database database, SignUpRequest request ) => {
   if ( await database.Users.AnyAsync( user => user.Email == request.Email ) ) return Results.BadRequest("Email already registered.");
