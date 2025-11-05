@@ -121,13 +121,13 @@ app.MapPatch( "update/item", async ( [FromServices] Database database, UpdateIte
   return Results.Ok( item );
 });
 
-app.MapGet( "get/items/by/owner", async ( [FromServices] Database database, GetItemByOwnerRequest request ) => {
-  var items = await database.Items.Where( item => item.OwnerID == request.OwnerID ).ToListAsync();
+app.MapGet( "get/items/by/owner/{OwnerID:guid}", async ( [FromServices] Database database, Guid OwnerID ) => {
+  var items = await database.Items.Where( item => item.OwnerID == OwnerID ).ToListAsync();
   return Results.Ok( items );
 });
 
-app.MapGet( "get/item/by/id", async ( [FromServices] Database database, GetItemByIDRequest request ) => {
-  var item = await database.Items.FindAsync( item => item.OwnerID == request.OwnerID );
+app.MapGet( "get/item/by/id/{ID:guid}", async ( [FromServices] Database database, Guid ID ) => {
+  var item = await database.Items.FindAsync( ID ); 
   if ( item is null ) return Results.NotFound( "Item not found." );
   return Results.Ok( item );
 });
