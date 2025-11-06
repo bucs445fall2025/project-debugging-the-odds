@@ -13,12 +13,17 @@ using Library;
 using Library.Storage;
 using static Library.JWTMethods;
 using System.Text.Json.Serialization;
+using Amazon.S3;
+using Amazon.S3.Model;
 
+#region Constants
 //NEW: allow Vite dev (5173) to call the API
 const string CorsPolicy = "BarterCors";
+#endregion
 
 Startup.print_startup_message();
 
+#region Builder Steps
 var builder = WebApplication.CreateBuilder( args );
 
 // Adding Swagger Docs
@@ -40,12 +45,28 @@ builder.Services.AddCors( origin => {
     );
 });
 
-builder.Services.AddSingleton( new Library.Storage.Seaweed(
+var seaweed = new Seaweed(
     "http://seaweed:8333",
     "barter_access",
     "barter_secret",
     "barter"
-));
+);
+
+builder.Services.AddSingleton( seaweed );
+
+// Ensure bucket exists
+var client_field = typeof( Seaweed ).GetField( "client", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance );
+var bucket_field = typeof( Seaweed ).GetField( "bucket", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance );
+
+var client = ( AmazonS3Client )client_field!.GetValue( seaweed )!;
+var bucket = ( string )bucket_field!.GetValue( seaweed )!;
+
+var response = await client.ListBucketsAsync();
+var buckets = response?.Buckets ?? new List<S3Bucket>();
+
+if ( !buckets.Any( buck => buck.BucketName == bucket ) ) await client.PutBucketAsync( new PutBucketRequest { BucketName = bucket } );
+
+#endregion
 
 var app = builder.Build();
 
@@ -60,21 +81,14 @@ app.UseCors(CorsPolicy);
 
 app.MapGet( "/", () => "Hello World!" );
 
+#region User Debug Routes
 // DEBUG ROUTES
 app.MapGet( "debug/dump/users", async ( [FromServices] Database database ) => {
-  if ( !app.Environment.IsDevelopment() ) return Results.BadRequest( "Forbidden." );
   var users = await database.Users.ToListAsync();
   return Results.Json( users );
 });
 
-app.MapGet( "debug/dump/items", async ( [FromServices] Database database ) => {
-  if ( !app.Environment.IsDevelopment() ) return Results.BadRequest( "Forbidden." );
-  var items = await database.Items.ToListAsync();
-  return Results.Json( items );
-});
-
-app.MapPost( "debug/delete/user", async ( [FromServices] Database database, DeleteUserRequest request ) => {
-  if ( !app.Environment.IsDevelopment() ) return Results.BadRequest( "Forbidden." );
+app.MapDelete( "debug/delete/user", async ( [FromServices] Database database, [FromBody] DeleteUserRequest request ) => {
   var user = await database.Users.SingleOrDefaultAsync( user => user.Email == request.Email );
   if ( user is null ) return Results.BadRequest( "Invalid credentials." );
   database.Users.Remove( user );
@@ -82,18 +96,11 @@ app.MapPost( "debug/delete/user", async ( [FromServices] Database database, Dele
   return Results.Ok( "Account Removed." );
 });
 
-app.MapPost( "debug/delete/item", async ( [FromServices] Database database, DeleteItemRequest request ) => {
-  if ( !app.Environment.IsDevelopment() ) return Results.BadRequest( "Forbidden." );
-  var item = await database.Items.SingleOrDefaultAsync( item => item.ID == request.ID );
-  if ( item is null ) return Results.BadRequest( "Invalid credentials." );
-  database.Items.Remove( item );
-  await database.SaveChangesAsync();
-  return Results.Ok( "Account Removed." );
-});
+#endregion
 
+#region Item Routes
 // Item Routes
-
-app.MapPost( "create/item", async ( [FromServices] Database database, CreateItemRequest request ) => {
+app.MapPost( "create/item", async ( [FromServices] Database database, [FromBody] CreateItemRequest request ) => {
   var item = new Item {
     ID = Guid.NewGuid(),
     OwnerID = request.OwnerID,
@@ -109,7 +116,7 @@ app.MapPost( "create/item", async ( [FromServices] Database database, CreateItem
   return Results.Ok( item );
 });
 
-app.MapPatch( "update/item", async ( [FromServices] Database database, UpdateItemRequest request ) => {
+app.MapPatch( "update/item", async ( [FromServices] Database database, [FromBody] UpdateItemRequest request ) => {
   var item = await database.Items.FindAsync( request.ID );
   if ( item is null ) return Results.NotFound( "Item not found." );
   
@@ -123,19 +130,89 @@ app.MapPatch( "update/item", async ( [FromServices] Database database, UpdateIte
   return Results.Ok( item );
 });
 
-app.MapGet( "get/items/by/owner/{OwnerID:guid}", async ( [FromServices] Database database, Guid OwnerID ) => {
-  var items = await database.Items.Where( item => item.OwnerID == OwnerID ).ToListAsync();
+app.MapGet( "get/items/by/owner/{owner_id:guid}", async ( [FromServices] Database database, Guid owner_id ) => {
+  var items = await database.Items.Where( item => item.OwnerID == owner_id ).ToListAsync();
   return Results.Ok( items );
 });
 
-app.MapGet( "get/item/by/id/{ID:guid}", async ( [FromServices] Database database, Guid ID ) => {
-  var item = await database.Items.FindAsync( ID ); 
+app.MapGet( "get/item/by/id/{id:guid}", async ( [FromServices] Database database, Guid id ) => {
+  var item = await database.Items.FindAsync( id ); 
   if ( item is null ) return Results.NotFound( "Item not found." );
   return Results.Ok( item );
 });
 
-// Authentication Routes
+// debug routes
+app.MapGet( "debug/dump/items", async ( [FromServices] Database database ) => {
+  var items = await database.Items.ToListAsync();
+  return Results.Json( items );
+});
 
+app.MapDelete( "debug/delete/item/{id:guid}", async ( [FromServices] Database database, Guid id ) => {
+  var item = await database.Items.SingleOrDefaultAsync( item => item.ID == id );
+  if ( item is null ) return Results.BadRequest( "Invalid credentials." );
+  database.Items.Remove( item );
+  await database.SaveChangesAsync();
+  return Results.Ok( "Account Removed." );
+});
+
+#endregion Item Routes
+
+#region Seaweed Image Routes
+// Seaweed Image Routes
+app.MapPost( "create/image", async ( HttpRequest request, [FromServices] Seaweed seaweed ) => {
+    if ( !request.HasFormContentType ) return Results.BadRequest( "Invalid form data." );
+
+    var form = await request.ReadFormAsync();
+    var file = form.Files["file"];
+    if ( file is null || file.Length == 0 ) return Results.BadRequest( "No file uploaded." );
+
+    var key = $"{ Guid.NewGuid() }";
+    await using var stream = file.OpenReadStream();
+    await seaweed.UploadAsync( key, stream, file.ContentType );
+
+    return Results.Ok( new { Key = key } );
+});
+
+app.MapGet( "get/image/{key}", async ( string key, [FromServices] Seaweed seaweed ) => {
+    try {
+        var stream = await seaweed.DownloadAsync( key );
+        return Results.File( stream, "application/octet-stream" );
+    }
+    catch ( AmazonS3Exception error ) when ( error.StatusCode == System.Net.HttpStatusCode.NotFound ) {
+        return Results.NotFound("Image not found.");
+    }
+});
+
+app.MapDelete( "debug/delete/image/{key}", async ( string key, [FromServices] Seaweed seaweed ) => {
+    var client_field = typeof( Seaweed ).GetField( "client", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance );
+    var bucket_field = typeof( Seaweed ).GetField( "bucket", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance );
+
+    var client = ( IAmazonS3 )client_field!.GetValue( seaweed )!;
+    var bucket = ( string )bucket_field!.GetValue( seaweed )!;
+
+    await client.DeleteObjectAsync( bucket, key );
+    return Results.Ok( $"Deleted image { key }" );
+});
+
+
+app.MapGet( "debug/dump/images", async ( [FromServices] Seaweed seaweed ) => {
+    var client_field = typeof( Seaweed ).GetField( "client", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance );
+    var bucket_field = typeof( Seaweed ).GetField( "bucket", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance );
+
+    var client = ( IAmazonS3 )client_field!.GetValue( seaweed )!;
+    var bucket = ( string )bucket_field!.GetValue( seaweed )!;
+
+    var response = await client.ListObjectsV2Async( new ListObjectsV2Request { BucketName = bucket } );
+    var keys = response.S3Objects?.Select( obj => obj.Key ).ToArray() ?? Array.Empty<string>();
+
+    return Results.Ok( keys );
+});
+
+#endregion
+
+
+#region Authentication Routes
+// Authentication Routes
 app.MapPost( "/authentication/sign/up", async ( [FromServices] Database database, SignUpRequest request ) => {
   if ( await database.Users.AnyAsync( user => user.Email == request.Email ) ) return Results.BadRequest("Email already registered.");
 
@@ -232,10 +309,11 @@ app.MapPost( "/authentication/apple", async ( [FromServices] Database database, 
     return Results.Ok( new { token } );
 });
 
+#endregion
 
 // GET /authentication/jwt/sign
-app.MapGet( "/authentication/jwt/sign", ( [FromQuery] Guid userId ) => {
-  string token = Library.JWTMethods.GenerateJwt( userId );
+app.MapGet( "/authentication/jwt/sign", ( [FromQuery] Guid user_id ) => {
+  string token = Library.JWTMethods.GenerateJwt( user_id );
   return Results.Ok( new { token } );
 });
 
