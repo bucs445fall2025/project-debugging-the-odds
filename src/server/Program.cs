@@ -176,7 +176,8 @@ app.MapPost( "create/image", async ( HttpRequest request, [FromServices] Seaweed
 app.MapGet( "get/image/{key}", async ( string key, [FromServices] Seaweed seaweed ) => {
     try {
         var stream = await seaweed.DownloadAsync( key );
-        return Results.File( stream, "application/octet-stream" );
+        var metadata = await seaweed.GetObjectMetadataAsync( key );
+        return Results.File( stream, metadata.ContentType );
     }
     catch ( AmazonS3Exception error ) when ( error.StatusCode == System.Net.HttpStatusCode.NotFound ) {
         return Results.NotFound("Image not found.");
