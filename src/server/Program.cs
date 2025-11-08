@@ -175,7 +175,7 @@ app.MapGet( "get/image/{key}", async ( string key, [FromServices] Seaweed seawee
 
         Console.WriteLine( $"GET  {bucket}: { key } -> { content_type }" );
 
-        return Results.File( image, content_type);
+        return Results.File( image, content_type );
     }
     catch ( AmazonS3Exception error ) when ( error.StatusCode == System.Net.HttpStatusCode.NotFound ) {
         return Results.NotFound( "Image not found." );
