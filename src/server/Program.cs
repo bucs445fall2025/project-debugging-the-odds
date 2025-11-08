@@ -55,12 +55,7 @@ var seaweed = new Seaweed(
 builder.Services.AddSingleton( seaweed );
 
 // Ensure bucket exists
-var client_field = typeof( Seaweed ).GetField( "client", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance );
-var bucket_field = typeof( Seaweed ).GetField( "bucket", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance );
-
-var client = ( AmazonS3Client )client_field!.GetValue( seaweed )!;
-var bucket = ( string )bucket_field!.GetValue( seaweed )!;
-
+var ( client, bucket ) = Library.StorageMethods.GetClientAndBucket( seaweed );
 var response = await client.ListBucketsAsync();
 var buckets = response?.Buckets ?? new List<S3Bucket>();
 
@@ -166,30 +161,29 @@ app.MapPost( "create/image", async ( HttpRequest request, [FromServices] Seaweed
     var file = form.Files["file"];
     if ( file is null || file.Length == 0 ) return Results.BadRequest( "No file uploaded." );
 
-    var key = $"{ Guid.NewGuid() }";
+    var key = Guid.NewGuid().ToString();
+
     await using var stream = file.OpenReadStream();
-    await seaweed.UploadAsync( key, stream, file.ContentType );
+    await seaweed.Upload( key, stream, file.ContentType );
 
     return Results.Ok( new { Key = key } );
 });
 
 app.MapGet( "get/image/{key}", async ( string key, [FromServices] Seaweed seaweed ) => {
     try {
-        var stream = await seaweed.DownloadAsync( key );
-        var metadata = await seaweed.GetObjectMetadataAsync( key );
-        return Results.File( stream, metadata.ContentType );
+        var ( image, content_type ) = await seaweed.Download( key );
+
+        Console.WriteLine( $"GET  {bucket}: { key } -> { content_type }" );
+
+        return Results.File( image, content_type);
     }
     catch ( AmazonS3Exception error ) when ( error.StatusCode == System.Net.HttpStatusCode.NotFound ) {
-        return Results.NotFound("Image not found.");
+        return Results.NotFound( "Image not found." );
     }
 });
 
 app.MapDelete( "debug/delete/image/{key}", async ( string key, [FromServices] Seaweed seaweed ) => {
-    var client_field = typeof( Seaweed ).GetField( "client", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance );
-    var bucket_field = typeof( Seaweed ).GetField( "bucket", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance );
-
-    var client = ( IAmazonS3 )client_field!.GetValue( seaweed )!;
-    var bucket = ( string )bucket_field!.GetValue( seaweed )!;
+    var ( client, bucket ) = Library.StorageMethods.GetClientAndBucket( seaweed );
 
     await client.DeleteObjectAsync( bucket, key );
     return Results.Ok( $"Deleted image { key }" );
@@ -197,11 +191,7 @@ app.MapDelete( "debug/delete/image/{key}", async ( string key, [FromServices] Se
 
 
 app.MapGet( "debug/dump/images", async ( [FromServices] Seaweed seaweed ) => {
-    var client_field = typeof( Seaweed ).GetField( "client", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance );
-    var bucket_field = typeof( Seaweed ).GetField( "bucket", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance );
-
-    var client = ( IAmazonS3 )client_field!.GetValue( seaweed )!;
-    var bucket = ( string )bucket_field!.GetValue( seaweed )!;
+    var ( client, bucket ) = Library.StorageMethods.GetClientAndBucket( seaweed );
 
     var response = await client.ListObjectsV2Async( new ListObjectsV2Request { BucketName = bucket } );
     var keys = response.S3Objects?.Select( obj => obj.Key ).ToArray() ?? Array.Empty<string>();

@@ -3,7 +3,8 @@ using System.Security.Claims;
 using System.Text;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
-
+using Amazon.S3;
+using Amazon.S3.Model;
 
 namespace Library {
   public static class Startup {
@@ -112,11 +113,23 @@ X: `*88888%`     ! 8888.+""      4888>        8888  8888   888E  9888      8888.
     }
   }
 
-  public static class DatabaseMethods { // name subject to change stoned rn not wasting brain power
+  public static class StorageMethods { // name subject to change stoned rn not wasting brain power
     public static void get_user( string email ) {
       using var database = new Database();
       var user = database.Users.First( user => user.Email == email );
       //return user;
+    }
+
+    public static ( IAmazonS3 client, string bucket ) GetClientAndBucket( Seaweed seaweed ) {
+      var client_field = typeof( Seaweed ).GetField( "client", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance );
+      var bucket_field = typeof( Seaweed ).GetField( "bucket", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance );
+
+      if ( client_field == null || bucket_field == null ) throw new InvalidOperationException( "Could not access Seaweed internal fields." );
+
+      var client = (IAmazonS3)client_field.GetValue( seaweed )!;
+      var bucket = (string)bucket_field.GetValue( seaweed )!;
+
+      return ( client, bucket );
     }
   }
 }

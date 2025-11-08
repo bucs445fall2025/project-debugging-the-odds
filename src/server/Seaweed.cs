@@ -15,20 +15,26 @@ namespace Library.Storage {
         bucket = bucket_id;
     }
 
-    public async Task<string> UploadAsync( string key, Stream file_stream, string content_type ) {
+    public async Task<string> Upload( string key, Stream stream, string content_type ) {
         var request = new PutObjectRequest {
             BucketName = bucket,
             Key = key,
-            InputStream = file_stream,
-            ContentType = content_type
+            InputStream = stream,
+            ContentType = content_type,
+            Headers = { ContentLength = stream.Length }
         };
+
+        request.UseChunkEncoding = false;
+
+        Console.WriteLine( $"POST { content_type }[ { stream.Length } ] -> { bucket }: { key }" );
+
         await client.PutObjectAsync( request );
         return key;
     }
 
-    public async Task<Stream> DownloadAsync( string key ) {
+    public async Task<(Stream, string)> Download( string key ) {
         var response = await client.GetObjectAsync( bucket, key );
-        return response.ResponseStream;
+        return ( response.ResponseStream, response.Headers.ContentType );
     }
   }
 }
