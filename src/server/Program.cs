@@ -115,6 +115,7 @@ app.MapPatch( "update/item", async ( [FromServices] Database database, [FromBody
   var item = await database.Items.FindAsync( request.ID );
   if ( item is null ) return Results.NotFound( "Item not found." );
   
+  Console.WriteLine( $"PATCH item[{ item.ID }] : { item.Name } -> { request.Name }, { item.Description } -> { request.Description }, { item.Category } -> { request.Category }");
   item.Name = request.Name;
   item.Description = request.Description;
   item.Category = request.Category;
@@ -246,6 +247,7 @@ app.MapPatch( "update/trade", async ( [FromServices] Database database, [FromBod
   var trade = await database.Trades.FindAsync( request.ID );
   if ( trade is null ) return Results.NotFound( "Item not found." );
   
+  Console.WriteLine( $"PATCH Trade[{ trade.ID }] : { trade.Status } -> { request.Status } | receiver == request : { trade.ReceiverID } == { request.Receiver }" );
   if ( request.Receiver != trade.ReceiverID ) return Results.BadRequest( "Only the receiving party can update." );
 
   trade.Status = request.Status;
@@ -267,7 +269,7 @@ app.MapGet( "get/trades/by/receiver/{user_id:guid}", async ( [FromServices] Data
   return Results.Ok( trades );
 });
 
-app.MapGet( "get/trades/by/initator/{user_id:guid}", async ( [FromServices] Database database, Guid user_id ) => {
+app.MapGet( "get/trades/by/initiator/{user_id:guid}", async ( [FromServices] Database database, Guid user_id ) => {
   var trades = await database.Trades.Where( item => item.InitiatorID == user_id ).ToListAsync();
   return Results.Ok( trades );
 });
