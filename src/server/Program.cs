@@ -147,7 +147,7 @@ app.MapDelete( "debug/delete/item/{id:guid}", async ( [FromServices] Database da
   if ( item is null ) return Results.BadRequest( "Invalid credentials." );
   database.Items.Remove( item );
   await database.SaveChangesAsync();
-  return Results.Ok( "Account Removed." );
+  return Results.Ok( "Item Removed." );
 });
 
 #endregion Item Routes
@@ -199,6 +199,92 @@ app.MapGet( "debug/dump/images", async ( [FromServices] Seaweed seaweed ) => {
     return Results.Ok( keys );
 });
 
+#endregion
+
+
+# region Trading Routes
+app.MapPost( "create/trade", async ( [FromServices] Database database, [FromBody] CreateTradeRequest request ) => {
+  // get each user
+  var initiator = await database.Users.Include( user => user.Items ).FirstOrDefaultAsync( user => user.ID == request.Initiator );
+  var receiver  = await database.Users.Include( user => user.Items ).FirstOrDefaultAsync( user => user.ID == request.Receiver );
+  if (initiator is null || receiver is null) return Results.BadRequest( "Invalid user(s)." );
+
+
+  // get their items
+  var initiator_item_ids = initiator.Items.Select( item => item.ID ).ToHashSet();
+  var receiver_item_ids  =  receiver.Items.Select( item => item.ID ).ToHashSet();
+
+  // offerings must belong to initiating party
+  if ( request.OfferingItems.Any( id => !initiator_item_ids.Contains( id ) ) ) return Results.BadRequest( "One or more offered items are not owned by the initiator." );
+
+  // sought items must belong to receiving party
+  if ( request.SeekingItems.Any( id  => !receiver_item_ids.Contains( id ) ) )  return Results.BadRequest( "One or more requested items are not owned by the receiver." );
+
+  var trade = new Trade {
+    ID = Guid.NewGuid(),
+    InitiatorID = request.Initiator,
+    ReceiverID = request.Receiver,
+    OfferingItemIDs = request.OfferingItems,
+    SeekingItemIDs = request.SeekingItems,
+    Status = Status.Requested
+  };
+
+  database.Trades.Add( trade );
+  await database.SaveChangesAsync();
+
+  return Results.Ok(new {
+    trade.ID,
+    trade.InitiatorID,
+    trade.ReceiverID,
+    trade.OfferingItemIDs,
+    trade.SeekingItemIDs,
+    trade.Status
+  });
+});
+
+app.MapPatch( "update/trade", async ( [FromServices] Database database, [FromBody] UpdateTradeRequest request ) => {
+  var trade = await database.Trades.FindAsync( request.ID );
+  if ( trade is null ) return Results.NotFound( "Item not found." );
+  
+  if ( request.Receiver != trade.ReceiverID ) return Results.BadRequest( "Only the receiving party can update." );
+
+  trade.Status = request.Status;
+
+
+  database.Trades.Update( trade );
+  await database.SaveChangesAsync();
+  return Results.Ok( trade );
+});
+
+app.MapGet( "get/trade/by/id/{id:guid}", async ( [FromServices] Database database, Guid id ) => {
+  var trade = await database.Trades.FindAsync( id ); 
+  if ( trade is null ) return Results.NotFound( "Trade not found." );
+  return Results.Ok( trade );
+});
+
+app.MapGet( "get/trades/by/receiver/{user_id:guid}", async ( [FromServices] Database database, Guid user_id ) => {
+  var trades = await database.Trades.Where( item => item.ReceiverID == user_id ).ToListAsync();
+  return Results.Ok( trades );
+});
+
+app.MapGet( "get/trades/by/initator/{user_id:guid}", async ( [FromServices] Database database, Guid user_id ) => {
+  var trades = await database.Trades.Where( item => item.InitiatorID == user_id ).ToListAsync();
+  return Results.Ok( trades );
+});
+
+// debug routes
+app.MapGet( "debug/dump/trades", async ( [FromServices] Database database ) => {
+  var trades = await database.Trades.ToListAsync();
+  return Results.Json( trades );
+});
+
+app.MapDelete( "debug/delete/trade/{id:guid}", async ( [FromServices] Database database, Guid id ) => {
+  var trade = await database.Trades.SingleOrDefaultAsync( trade => trade.ID == id );
+  if ( trade is null ) return Results.BadRequest( "Invalid credentials." );
+  database.Trades.Remove( trade );
+  await database.SaveChangesAsync();
+  return Results.Ok( "Trade Removed." );
+});
 #endregion
 
 

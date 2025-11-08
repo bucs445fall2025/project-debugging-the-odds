@@ -1,5 +1,7 @@
 namespace Library.Storage {
     using Microsoft.EntityFrameworkCore;
+    using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+    using System.Text.Json;
 
     public enum Category {
         Clothing,
@@ -10,6 +12,13 @@ namespace Library.Storage {
         Tools,
         Experience,
         Other
+    }
+
+    public enum Status {
+        Requested,
+        Accepted,
+        Rejected,
+        Countered
     }
 
     // users table schema
@@ -64,10 +73,28 @@ namespace Library.Storage {
         public string MimeType { get; set; } = "image/png";
     }
 
+    public class Trade {
+        public required Guid ID { get; set; } = Guid.NewGuid();
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+        public required Guid InitiatorID { get; set; }
+        public required Guid ReceiverID { get; set; }
+
+        public required Guid[] OfferingItemIDs { get; set; } = Array.Empty<Guid>();
+        public required Guid[] SeekingItemIDs { get; set; } = Array.Empty<Guid>();
+
+        public required Status Status { get; set; } = Status.Requested;
+
+        public User? Initiator { get; set; }
+        public User? Receiver { get; set; }
+    }
+
     public class Database : DbContext {
         public DbSet<User> Users => Set<User>();
         public DbSet<Item> Items => Set<Item>();
         public DbSet<Image> Images => Set<Image>();
+        public DbSet<Trade> Trades => Set<Trade>();
 
         protected override void OnConfiguring( DbContextOptionsBuilder optionsBuilder ) {
             // Use environment variable or config for dockerized connection
@@ -79,6 +106,11 @@ namespace Library.Storage {
         }
 
         protected override void OnModelCreating( ModelBuilder modelBuilder ) {
+            var guid_array_converter = new ValueConverter<Guid[], string>(
+              v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
+              v => JsonSerializer.Deserialize<Guid[]>(v, new JsonSerializerOptions()) ?? Array.Empty<Guid>()            
+            );
+
             modelBuilder.Entity<User>()
                 .HasIndex( user => user.Email )
                 .IsUnique();
@@ -102,6 +134,34 @@ namespace Library.Storage {
             modelBuilder.Entity<Image>()
                 .HasIndex( image => image.Key )
                 .IsUnique();
+
+
+            modelBuilder.Entity<Trade>()
+                .Property( trade => trade.OfferingItemIDs )
+                .HasConversion( guid_array_converter )
+                .HasColumnType( "jsonb" );
+
+            modelBuilder.Entity<Trade>()
+                .Property( trade => trade.SeekingItemIDs )
+                .HasConversion( guid_array_converter )
+                .HasColumnType( "jsonb" );
+
+            modelBuilder.Entity<Trade>( entity => {
+                entity.HasOne( trade => trade.Initiator )
+                .WithMany()
+                .HasForeignKey( trade => trade.InitiatorID )
+                .OnDelete( DeleteBehavior.Restrict );
+
+                entity.HasOne( trade => trade.Receiver )
+                .WithMany()
+                .HasForeignKey( trade => trade.ReceiverID )
+                .OnDelete( DeleteBehavior.Restrict );
+
+                // Disallow self-trade
+                entity.ToTable(table => table.HasCheckConstraint(
+                  "CK_Trade_DifferentUsers", @"""InitiatorID"" <> ""ReceiverID"""
+                ));
+            });
         }
     }
 }
