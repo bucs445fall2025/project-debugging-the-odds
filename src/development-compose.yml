@@ -24,7 +24,7 @@ services:
       - "9333:9333"   # master
       - "8080:8080"   # filer UI
     volumes:
-      - ./seaweed/data:/data
+      - seaweed_data:/data
       - ./seaweed/config.json:/etc/seaweedfs/config.json
     environment:
       - WEED_S3_ACCESS_KEY=barter_access
@@ -103,6 +103,7 @@ services:
     restart: unless-stopped
 volumes:
   data:
+  seaweed_data:
 networks:
   barter-network: {}
 
