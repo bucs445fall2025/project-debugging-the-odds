@@ -92,7 +92,7 @@ X: `*88888%`     ! 8888.+""      4888>        8888  8888   888E  9888      8888.
       var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
       var token = new JwtSecurityToken(
-        claims: new[] { new Claim(ClaimTypes.NameIdentifier, userId.ToString()) },
+        claims: new[] { new Claim("user_id", userId.ToString()) },
         expires: DateTime.UtcNow.AddHours(1),
         signingCredentials: creds
       );
