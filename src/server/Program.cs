@@ -100,7 +100,7 @@ app.MapGet( "get/user/by/id/{id:guid}", async ( [FromServices] Database database
     return Results.Ok( user );
 });
 
-app.MapGet( "get/user/by/email/{email:string}", async ( [FromServices] Database database, string email ) => {
+app.MapGet( "get/user/by/email/{email}", async ( [FromServices] Database database, string email ) => {
   var user = await database.Users.SingleOrDefaultAsync( user => user.Email == email );
     if ( user is null ) return Results.NotFound( "User not found." );
     return Results.Ok( user );
