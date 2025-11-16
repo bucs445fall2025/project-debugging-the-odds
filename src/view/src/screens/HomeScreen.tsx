@@ -8,11 +8,20 @@ import {
 import LoginCard from '@/components/LoginCard';
 import SignupCard from '@/components/SignupCard';
 import VelocityBanner from '@/components/VelocityBanner';
-import { signinNow, signupNow } from '@/api';
-import SoftBlindsBackground from '@/components/SoftBlindsBackground';
+import { signinNow, signupNow} from '@/api';
 import CardFanBackground from '@/components/CardFanBackground';
 
-export default function HomeScreen() {
+// Add this type to match App.tsx
+export type AuthUser = {
+  email: string;
+  token: string;
+};
+
+export default function HomeScreen({
+  onAuthenticated,
+}: {
+  onAuthenticated: (u: AuthUser) => void;   // <-- NEW
+}) {
   const { width: W0, height: H0 } = Dimensions.get('window');
   const W = W0 || (typeof window !== 'undefined' ? window.innerWidth : 360);
   const H = H0 || (typeof window !== 'undefined' ? window.innerHeight : 640);
@@ -38,63 +47,67 @@ export default function HomeScreen() {
   const opacityLogin = slide.interpolate({ inputRange: [0, 0.2, 0.8, 1], outputRange: [1, 0.7, 0.2, 0] });
   const opacitySignup = slide.interpolate({ inputRange: [0, 0.2, 0.8, 1], outputRange: [0, 0.2, 0.7, 1] });
 
+  // ---- API handlers ----
   const handleSignIn = async (email: string, password: string) => {
-    try { const res = await signinNow(email, password); console.log('signed in', res); }
-    catch (err) { console.error('signin error', err); alert(err instanceof Error ? err.message : String(err)); }
+    try {
+      const res = await signinNow(email, password); // expects { token }
+      if (!res?.token) throw new Error('No token returned from API.');
+      // Notify App to switch to TradingFloor:
+      onAuthenticated({ email, token: res.token });      // <-- NEW
+    } catch (err) {
+      console.error('signin error', err);
+      alert(err instanceof Error ? err.message : String(err));
+    }
   };
-  const handleSignUp = async (d: { firstName: string; lastName: string; email: string; password: string; birthdate: string; }) => {
-    try { await signupNow(d.email, d.password); go('login'); }
-    catch (err) { console.error('signup error', err); alert(err instanceof Error ? err.message : String(err)); }
+
+  const handleSignUp = async (d: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    password: string;
+    birthdate: string;
+  }) => {
+    try {
+      await signupNow(d.email, d.password);
+      go('login');
+    } catch (err) {
+      console.error('signup error', err);
+      alert(err instanceof Error ? err.message : String(err));
+    }
   };
 
   return (
     <View style={{ flex: 1, height: '100vh', overflow: 'hidden', position: 'relative' }}>
-      {/* Subtle moving gradient base */}
-          {/* NEW: Fan of cards directly behind auth card */}
-           <View style={[StyleSheet.absoluteFill, { backgroundColor: '#7c4c4cff' }]} />
-      <View
-        style={[
-          StyleSheet.absoluteFill,
-          { backgroundColor: '#613200ff', opacity: 0.7 },
-        ]}
-      />
-      <View
-        style={{
-          position: 'absolute',
-          left: -800,
-          top: -800,
-          width: 1200,
-          height: 2000,
-          backgroundColor: '#1d1510',
-          opacity: 0.65,
-          transform: [{ rotate: '35deg' }],
-        }}
-      />
-     <CardFanBackground
+      {/* Background */}
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#7c4c4cff' }]} />
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#613200ff', opacity: 0.7 }]} />
+      <View style={{ position: 'absolute', left: -800, top: -800, width: 1200, height: 2000, backgroundColor: '#1d1510', opacity: 0.65, transform: [{ rotate: '35deg' }] }} />
+
+      <CardFanBackground
         count={15}
         spreadDeg={680}
         radiusPct={0.05}
-        radiusJitter= {16}
-        angleJitterDeg = {15}
+        radiusJitter={16}
+        angleJitterDeg={15}
         baseCardW={120}
         baseCardH={240}
-        scaleMin = {0.6}
-        scaleMax = {0.9}
+        scaleMin={0.6}
+        scaleMax={0.9}
         borderRadius={40}
         skins={[
-          { base: '#2b2118', overlay: '#4b3621' }, // deep brown
-          { base: '#33261d', overlay: '#6b4a2f' }, // mahogany
-          { base: '#3a2a1f', overlay: '#8B5A2B' }, // saddle brown
-          { base: '#281e16', overlay: '#5a4028' }, // dark roast
+          { base: '#2b2118', overlay: '#4b3621' },
+          { base: '#33261d', overlay: '#6b4a2f' },
+          { base: '#3a2a1f', overlay: '#8B5A2B' },
+          { base: '#281e16', overlay: '#5a4028' },
         ]}
-/>
+      />
+
       {/* Center banner UNDER the cards */}
       <View pointerEvents="none" style={[StyleSheet.absoluteFill, { zIndex: 3, justifyContent: 'center' }]}>
         <VelocityBanner text=" Swap Smarter • Swap Smarter •" height={50} fontSize={45} speed={60} opacity={0.50} reverse />
         <VelocityBanner text=" Trade Anything • Trade Anything •" height={50} fontSize={45} speed={60} opacity={0.50} />
       </View>
 
- 
       {/* Foreground: auth cards */}
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -111,7 +124,7 @@ export default function HomeScreen() {
                 cardW={cardW}
                 cardH={cardH}
                 onCreate={() => go('signup')}
-                onSubmit={handleSignIn}
+                onSubmit={handleSignIn}   // <-- will call onAuthenticated on success
                 onForgot={() => console.log('Forgot password')}
               />
             </View>

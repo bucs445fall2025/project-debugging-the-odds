@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace server.Migrations
 {
     [DbContext(typeof(Database))]
-    [Migration("20251105205918_Common")]
+    [Migration("20251109213612_Common")]
     partial class Common
     {
         /// <inheritdoc />
@@ -88,6 +88,47 @@ namespace server.Migrations
                     b.ToTable("Items");
                 });
 
+            modelBuilder.Entity("Library.Storage.Trade", b =>
+                {
+                    b.Property<Guid>("ID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("InitiatorID")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("OfferingItemIDs")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<Guid>("ReceiverID")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SeekingItemIDs")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("ID");
+
+                    b.HasIndex("InitiatorID");
+
+                    b.HasIndex("ReceiverID");
+
+                    b.ToTable("Trades", t =>
+                        {
+                            t.HasCheckConstraint("CK_Trade_DifferentUsers", "\"InitiatorID\" <> \"ReceiverID\"");
+                        });
+                });
+
             modelBuilder.Entity("Library.Storage.User", b =>
                 {
                     b.Property<Guid>("ID")
@@ -134,7 +175,7 @@ namespace server.Migrations
 
                     b.ToTable("Users", t =>
                         {
-                            t.HasCheckConstraint("CHECK_User_AuthenticationFields", " ( (\"PasswordHash\" IS NOT NULL AND \"PasswordSalt\" IS NOT NULL AND \"OAuthProvider\" IS NULL)\n                  OR\n                    (\"PasswordHash\" IS NULL AND \"PasswordSalt\" IS NULL AND \"OAuthProvider\" IS NOT NULL)\n                )");
+                            t.HasCheckConstraint("CHECK_User_AuthenticationFields", " ( (\"PasswordHash\" IS NOT NULL AND \"PasswordSalt\" IS NOT NULL AND \"OAuthProvider\" IS NULL)\r\n                  OR\r\n                    (\"PasswordHash\" IS NULL AND \"PasswordSalt\" IS NULL AND \"OAuthProvider\" IS NOT NULL)\r\n                )");
                         });
                 });
 
@@ -158,6 +199,25 @@ namespace server.Migrations
                         .IsRequired();
 
                     b.Navigation("Owner");
+                });
+
+            modelBuilder.Entity("Library.Storage.Trade", b =>
+                {
+                    b.HasOne("Library.Storage.User", "Initiator")
+                        .WithMany()
+                        .HasForeignKey("InitiatorID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Library.Storage.User", "Receiver")
+                        .WithMany()
+                        .HasForeignKey("ReceiverID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Initiator");
+
+                    b.Navigation("Receiver");
                 });
 
             modelBuilder.Entity("Library.Storage.User", b =>

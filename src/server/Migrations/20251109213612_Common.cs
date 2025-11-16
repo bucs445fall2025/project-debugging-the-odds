@@ -46,7 +46,7 @@ namespace server.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Users", x => x.ID);
-                    table.CheckConstraint("CHECK_User_AuthenticationFields", " ( (\"PasswordHash\" IS NOT NULL AND \"PasswordSalt\" IS NOT NULL AND \"OAuthProvider\" IS NULL)\n                  OR\n                    (\"PasswordHash\" IS NULL AND \"PasswordSalt\" IS NULL AND \"OAuthProvider\" IS NOT NULL)\n                )");
+                    table.CheckConstraint("CHECK_User_AuthenticationFields", " ( (\"PasswordHash\" IS NOT NULL AND \"PasswordSalt\" IS NOT NULL AND \"OAuthProvider\" IS NULL)\r\n                  OR\r\n                    (\"PasswordHash\" IS NULL AND \"PasswordSalt\" IS NULL AND \"OAuthProvider\" IS NOT NULL)\r\n                )");
                     table.ForeignKey(
                         name: "FK_Users_Images_ProfilePictureID",
                         column: x => x.ProfilePictureID,
@@ -76,6 +76,37 @@ namespace server.Migrations
                         onDelete: ReferentialAction.Cascade);
                 });
 
+            migrationBuilder.CreateTable(
+                name: "Trades",
+                columns: table => new
+                {
+                    ID = table.Column<Guid>(type: "uuid", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    InitiatorID = table.Column<Guid>(type: "uuid", nullable: false),
+                    ReceiverID = table.Column<Guid>(type: "uuid", nullable: false),
+                    OfferingItemIDs = table.Column<string>(type: "jsonb", nullable: false),
+                    SeekingItemIDs = table.Column<string>(type: "jsonb", nullable: false),
+                    Status = table.Column<int>(type: "integer", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Trades", x => x.ID);
+                    table.CheckConstraint("CK_Trade_DifferentUsers", "\"InitiatorID\" <> \"ReceiverID\"");
+                    table.ForeignKey(
+                        name: "FK_Trades_Users_InitiatorID",
+                        column: x => x.InitiatorID,
+                        principalTable: "Users",
+                        principalColumn: "ID",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_Trades_Users_ReceiverID",
+                        column: x => x.ReceiverID,
+                        principalTable: "Users",
+                        principalColumn: "ID",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
             migrationBuilder.CreateIndex(
                 name: "IX_Images_ItemID",
                 table: "Images",
@@ -91,6 +122,16 @@ namespace server.Migrations
                 name: "IX_Items_OwnerID",
                 table: "Items",
                 column: "OwnerID");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Trades_InitiatorID",
+                table: "Trades",
+                column: "InitiatorID");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Trades_ReceiverID",
+                table: "Trades",
+                column: "ReceiverID");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Users_Email",
@@ -118,6 +159,9 @@ namespace server.Migrations
             migrationBuilder.DropForeignKey(
                 name: "FK_Images_Items_ItemID",
                 table: "Images");
+
+            migrationBuilder.DropTable(
+                name: "Trades");
 
             migrationBuilder.DropTable(
                 name: "Items");

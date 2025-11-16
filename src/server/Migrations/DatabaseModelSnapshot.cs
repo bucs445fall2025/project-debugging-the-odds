@@ -172,7 +172,7 @@ namespace server.Migrations
 
                     b.ToTable("Users", t =>
                         {
-                            t.HasCheckConstraint("CHECK_User_AuthenticationFields", " ( (\"PasswordHash\" IS NOT NULL AND \"PasswordSalt\" IS NOT NULL AND \"OAuthProvider\" IS NULL)\n                  OR\n                    (\"PasswordHash\" IS NULL AND \"PasswordSalt\" IS NULL AND \"OAuthProvider\" IS NOT NULL)\n                )");
+                            t.HasCheckConstraint("CHECK_User_AuthenticationFields", " ( (\"PasswordHash\" IS NOT NULL AND \"PasswordSalt\" IS NOT NULL AND \"OAuthProvider\" IS NULL)\r\n                  OR\r\n                    (\"PasswordHash\" IS NULL AND \"PasswordSalt\" IS NULL AND \"OAuthProvider\" IS NOT NULL)\r\n                )");
                         });
                 });
 
