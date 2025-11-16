@@ -74,7 +74,7 @@ export default function VelocityBanner({
         toValue: to,
         duration,
         easing: Easing.linear,
-        useNativeDriver: true,
+        useNativeDriver: false,
       }).start(({ finished }) => {
         if (!finished) return;
         x.setValue(from);          // instant wrap
@@ -93,7 +93,7 @@ export default function VelocityBanner({
   }, [containerW, copyW, groupW, speed, reverse, startLoop]);
 
   const Group = ({ measure }: { measure?: boolean }) => (
-    <View style={styles.group} pointerEvents="none">
+    <View style={[styles.group, { pointerEvents: 'none' }]}>
       {Array.from({ length: copies }).map((_, i) => (
         <View
           key={i}
@@ -121,9 +121,8 @@ export default function VelocityBanner({
 
   return (
     <View
-      style={[styles.wrap, { height: effectiveHeight, opacity }]}
+      style={[styles.wrap, { height: effectiveHeight, opacity, pointerEvents: 'none' }]}
       onLayout={onMeasureContainer}
-      pointerEvents="none"
     >
       <Animated.View style={{ flexDirection: 'row', alignItems: 'center', transform: [{ translateX: x }] }}>
         <Group measure />

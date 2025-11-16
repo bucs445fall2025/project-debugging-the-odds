@@ -30,6 +30,17 @@ const CATEGORY_LABELS = [
 
 type EnumType = (typeof CATEGORY_LABELS)[number]['enum'];
 
+const webSelectStyle: React.CSSProperties = {
+  width: '100%',
+  backgroundColor: 'transparent',
+  color: '#F5EDE3',
+  border: 'none',
+  outline: 'none',
+  padding: '8px 4px',
+  fontSize: 14,
+  appearance: 'none' as any,
+};
+
 export default function AddItemCard({ visible, ownerId, onClose, onCreate }: Props) {
   const [name, setName] = useState('');
   const [desc, setDesc] = useState('');
@@ -115,7 +126,7 @@ export default function AddItemCard({ visible, ownerId, onClose, onCreate }: Pro
             <select
               value={catLabel}
               onChange={(e) => setCatLabel(e.target.value as any)}
-              style={styles.select as React.CSSProperties}
+              style={webSelectStyle}
             >
               {CATEGORY_LABELS.map((opt) => (
                 <option value={opt.label} key={opt.enum}>
@@ -134,7 +145,7 @@ export default function AddItemCard({ visible, ownerId, onClose, onCreate }: Pro
         {Platform.OS === 'web' && (
           <>
             <TouchableOpacity onPress={pickImagesWeb} style={styles.secondaryBtn}>
-              <Text style={styles.secondaryBtnText}>Choose Images…</Text>
+              <Text style={styles.secondaryBtnText}>Choose Images...</Text>
             </TouchableOpacity>
             {/* eslint-disable-next-line react/no-unknown-property */}
             <input
@@ -216,16 +227,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 2,
-  },
-  select: {
-    width: '100%',
-    background: 'transparent',
-    color: '#F5EDE3',
-    border: 'none',
-    outline: 'none',
-    padding: '8px 4px',
-    fontSize: 14,
-    appearance: 'none',
   },
   nativeSelectFallback: { borderRadius: 12, padding: 12 },
   previewRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 },

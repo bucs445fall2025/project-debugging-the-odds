@@ -89,7 +89,7 @@ export default function CardFanBackground({
   const cardH = Math.round(baseCardH * (S / 390));
 
   return (
-    <View pointerEvents="none" style={[StyleSheet.absoluteFill, { zIndex: 3 }]}>
+    <View style={[StyleSheet.absoluteFill, { zIndex: 3, pointerEvents: 'none' }]}>
       {cards.map((c, i) => {
         const skin = palette[i % palette.length]; // ← alternate/cycle skins
         return (
@@ -107,10 +107,6 @@ export default function CardFanBackground({
               width: cardW, height: cardH,
               borderRadius,
               overflow: 'hidden',
-              shadowColor: '#000',
-              shadowOpacity: 0.35,
-              shadowRadius: 16,
-              shadowOffset: { width: 0, height: 10 },
               // @ts-ignore (web)
               boxShadow: `0 10px 26px ${shadowColor}`,
               // @ts-ignore (web)
@@ -135,3 +131,6 @@ export default function CardFanBackground({
     </View>
   );
 }
+
+
+

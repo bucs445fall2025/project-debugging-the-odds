@@ -15,6 +15,8 @@ using static Library.JWTMethods;
 using System.Text.Json.Serialization;
 using Amazon.S3;
 using Amazon.S3.Model;
+using System.Linq;
+using System.Collections.Generic;
 
 #region Constants
 //NEW: allow Vite dev (5173) to call the API
@@ -109,45 +111,91 @@ app.MapGet( "get/user/by/email/{email}", async ( [FromServices] Database databas
 #region Item Routes
 // Item Routes
 app.MapPost( "create/item", async ( [FromServices] Database database, [FromBody] CreateItemRequest request ) => {
+  if ( string.IsNullOrWhiteSpace( request.Category ) || !Enum.TryParse<Category>( request.Category, true, out var category_enum ) ) {
+    return Results.BadRequest( "Invalid category." );
+  }
+
   var item = new Item {
     ID = Guid.NewGuid(),
     OwnerID = request.OwnerID,
     Name = request.Name,
     Description = request.Description,
-    Category = request.Category,
-    Images = Array.Empty<Image>()
+    Category = category_enum,
+    Images = new List<Image>()
   };
+
+  if ( request.ImageKeys is { Length: > 0 } ) {
+    var sanitized = request.ImageKeys
+      .Where( key => !string.IsNullOrWhiteSpace( key ) )
+      .Distinct()
+      .Select( key => new Image {
+        ID = Guid.NewGuid(),
+        ItemID = item.ID,
+        Key = key!.Trim()
+      })
+      .ToList();
+
+    item.Images = sanitized;
+  }
 
   database.Items.Add( item );
   await database.SaveChangesAsync();
+  await database.Entry( item ).Collection( i => i.Images ).LoadAsync();
 
-  return Results.Ok( item );
+  return Results.Ok( ShapeItem( item ) );
 });
 
 app.MapPatch( "update/item", async ( [FromServices] Database database, [FromBody] UpdateItemRequest request ) => {
-  var item = await database.Items.FindAsync( request.ID );
+  if ( string.IsNullOrWhiteSpace( request.Category ) || !Enum.TryParse<Category>( request.Category, true, out var category_enum ) ) {
+    return Results.BadRequest( "Invalid category." );
+  }
+
+  var item = await database.Items.Include( i => i.Images ).SingleOrDefaultAsync( i => i.ID == request.ID );
   if ( item is null ) return Results.NotFound( "Item not found." );
   
-  Console.WriteLine( $"PATCH item[{ item.ID }] : { item.Name } -> { request.Name }, { item.Description } -> { request.Description }, { item.Category } -> { request.Category }");
+  Console.WriteLine( $"PATCH item[{ item.ID }] : { item.Name } -> { request.Name }, { item.Description } -> { request.Description }, { item.Category } -> { category_enum }");
   item.Name = request.Name;
   item.Description = request.Description;
-  item.Category = request.Category;
+  item.Category = category_enum;
 
+  if ( request.ImageKeys is not null ) {
+    item.Images ??= new List<Image>();
+    if ( item.Images.Any() ) database.Images.RemoveRange( item.Images );
+
+    item.Images = request.ImageKeys
+      .Where( key => !string.IsNullOrWhiteSpace( key ) )
+      .Distinct()
+      .Select( key => new Image {
+        ID = Guid.NewGuid(),
+        ItemID = item.ID,
+        Key = key!.Trim()
+      })
+      .ToList();
+  }
 
   database.Items.Update( item );
   await database.SaveChangesAsync();
-  return Results.Ok( item );
+  await database.Entry( item ).Collection( i => i.Images ).LoadAsync();
+  return Results.Ok( ShapeItem( item ) );
 });
 
 app.MapGet( "get/items/by/owner/{owner_id:guid}", async ( [FromServices] Database database, Guid owner_id ) => {
-  var items = await database.Items.Where( item => item.OwnerID == owner_id ).ToListAsync();
-  return Results.Ok( items );
+  var items = await database.Items
+    .Where( item => item.OwnerID == owner_id )
+    .Include( item => item.Images )
+    .ToListAsync();
+  return Results.Ok( items.Select( ShapeItem ) );
+});
+
+app.MapGet( "get/items", async ( [FromServices] Database database ) => {
+  var items = await database.Items.Include( item => item.Images ).ToListAsync();
+  return Results.Ok( items.Select( ShapeItem ) );
 });
 
 app.MapGet( "get/item/by/id/{id:guid}", async ( [FromServices] Database database, Guid id ) => {
-  var item = await database.Items.FindAsync( id ); 
+  var item = await database.Items.Include( entry => entry.Images ).SingleOrDefaultAsync( entry => entry.ID == id ); 
   if ( item is null ) return Results.NotFound( "Item not found." );
-  return Results.Ok( item );
+  return Results.Ok( ShapeItem( item ) );
 });
 
 // debug routes
@@ -156,12 +204,14 @@ app.MapGet( "debug/dump/items", async ( [FromServices] Database database ) => {
   return Results.Json( items );
 });
 
-app.MapDelete( "debug/delete/item/{id:guid}", async ( [FromServices] Database database, Guid id ) => {
-  var item = await database.Items.SingleOrDefaultAsync( item => item.ID == id );
-  if ( item is null ) return Results.BadRequest( "Invalid credentials." );
+app.MapDelete( "delete/item/{id:guid}", async ( [FromServices] Database database, Guid id, [FromQuery] Guid ownerId ) => {
+  var item = await database.Items.Include( entry => entry.Images ).SingleOrDefaultAsync( entry => entry.ID == id );
+  if ( item is null ) return Results.NotFound( "Item not found." );
+  if ( item.OwnerID != ownerId ) return Results.Forbid();
+
   database.Items.Remove( item );
   await database.SaveChangesAsync();
-  return Results.Ok( "Item Removed." );
+  return Results.Ok( "Item removed." );
 });
 
 #endregion Item Routes
@@ -257,13 +307,17 @@ app.MapPost( "create/trade", async ( [FromServices] Database database, [FromBody
 });
 
 app.MapPatch( "update/trade", async ( [FromServices] Database database, [FromBody] UpdateTradeRequest request ) => {
+  if ( string.IsNullOrWhiteSpace( request.Status ) || !Enum.TryParse<Status>( request.Status, true, out var status_enum ) ) {
+    return Results.BadRequest( "Invalid status." );
+  }
+
   var trade = await database.Trades.FindAsync( request.ID );
   if ( trade is null ) return Results.NotFound( "Item not found." );
   
-  Console.WriteLine( $"PATCH Trade[{ trade.ID }] : { trade.Status } -> { request.Status } | receiver == request : { trade.ReceiverID } == { request.Receiver }" );
+  Console.WriteLine( $"PATCH Trade[{ trade.ID }] : { trade.Status } -> { status_enum } | receiver == request : { trade.ReceiverID } == { request.Receiver }" );
   if ( request.Receiver != trade.ReceiverID ) return Results.BadRequest( "Only the receiving party can update." );
 
-  trade.Status = request.Status;
+  trade.Status = status_enum;
 
 
   database.Trades.Update( trade );
@@ -285,6 +339,21 @@ app.MapGet( "get/trades/by/receiver/{user_id:guid}", async ( [FromServices] Data
 app.MapGet( "get/trades/by/initiator/{user_id:guid}", async ( [FromServices] Database database, Guid user_id ) => {
   var trades = await database.Trades.Where( item => item.InitiatorID == user_id ).ToListAsync();
   return Results.Ok( trades );
+});
+
+app.MapGet( "get/trades/pending/{user_id:guid}", async ( [FromServices] Database database, Guid user_id ) => {
+  var trades = await database.Trades
+    .Where( trade => trade.ReceiverID == user_id && ( trade.Status == Status.Requested || trade.Status == Status.Countered ) )
+    .ToListAsync();
+
+  var item_ids = trades.SelectMany( trade => trade.OfferingItemIDs.Concat( trade.SeekingItemIDs ) ).ToHashSet();
+  var items = await database.Items
+    .Include( item => item.Images )
+    .Where( item => item_ids.Contains( item.ID ) )
+    .ToListAsync();
+
+  var shaped = trades.Select( trade => ShapeTrade( trade, items ) );
+  return Results.Ok( shaped );
 });
 
 // debug routes
@@ -411,3 +480,29 @@ app.MapGet( "/authentication/jwt/sign", ( [FromQuery] Guid user_id ) => {
 
 
 app.Run();
+
+static object ShapeItem( Item item ) {
+  return new {
+    item.ID,
+    item.OwnerID,
+    item.Name,
+    item.Description,
+    Category = item.Category.ToString(),
+    ImageKeys = (item.Images ?? Array.Empty<Image>()).Select( image => image.Key ).ToArray()
+  };
+}
+
+static object ShapeTrade( Trade trade, IEnumerable<Item> sourceItems ) {
+  var item_lookup = sourceItems.ToDictionary( item => item.ID, item => item );
+  var offering = trade.OfferingItemIDs.Select( id => item_lookup.TryGetValue( id, out var found ) ? ShapeItem( found ) : null ).Where( item => item is not null ).ToArray();
+  var seeking = trade.SeekingItemIDs.Select( id => item_lookup.TryGetValue( id, out var found ) ? ShapeItem( found ) : null ).Where( item => item is not null ).ToArray();
+
+  return new {
+    trade.ID,
+    trade.InitiatorID,
+    trade.ReceiverID,
+    Status = trade.Status.ToString(),
+    OfferingItems = offering,
+    SeekingItems = seeking
+  };
+}

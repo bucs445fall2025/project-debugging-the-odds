@@ -38,7 +38,7 @@ export default function HomeScreen({
       toValue: to === 'login' ? 0 : 1,
       duration: 800,
       easing: Easing.bezier(0.22, 1, 0.36, 1),
-      useNativeDriver: true,
+      useNativeDriver: false,
     }).start();
   };
 
@@ -103,7 +103,7 @@ export default function HomeScreen({
       />
 
       {/* Center banner UNDER the cards */}
-      <View pointerEvents="none" style={[StyleSheet.absoluteFill, { zIndex: 3, justifyContent: 'center' }]}>
+      <View style={[StyleSheet.absoluteFill, { zIndex: 3, justifyContent: 'center', pointerEvents: 'none' }]}>
         <VelocityBanner text=" Swap Smarter • Swap Smarter •" height={50} fontSize={45} speed={60} opacity={0.50} reverse />
         <VelocityBanner text=" Trade Anything • Trade Anything •" height={50} fontSize={45} speed={60} opacity={0.50} />
       </View>
@@ -116,8 +116,15 @@ export default function HomeScreen({
         <View style={{ width: '100%', maxWidth: 480, height: H, overflow: 'hidden', position: 'relative' }}>
           {/* LOGIN */}
           <Animated.View
-            style={[StyleSheet.absoluteFill, { transform: [{ translateY: translateYLogin }], opacity: opacityLogin, zIndex: 3 }]}
-            pointerEvents={mode === 'login' ? 'auto' : 'none'}
+            style={[
+              StyleSheet.absoluteFill,
+              {
+                transform: [{ translateY: translateYLogin }],
+                opacity: opacityLogin,
+                zIndex: 3,
+                pointerEvents: mode === 'login' ? 'auto' : 'none',
+              },
+            ]}
           >
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
               <LoginCard
@@ -132,8 +139,15 @@ export default function HomeScreen({
 
           {/* SIGNUP */}
           <Animated.View
-            style={[StyleSheet.absoluteFill, { transform: [{ translateY: translateYSignup }], opacity: opacitySignup, zIndex: 2 }]}
-            pointerEvents={mode === 'signup' ? 'auto' : 'none'}
+            style={[
+              StyleSheet.absoluteFill,
+              {
+                transform: [{ translateY: translateYSignup }],
+                opacity: opacitySignup,
+                zIndex: 2,
+                pointerEvents: mode === 'signup' ? 'auto' : 'none',
+              },
+            ]}
           >
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
               <SignupCard
