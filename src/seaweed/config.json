@@ -1,0 +1,20 @@
+{
+  "identities": [
+    {
+      "name": "barter_access",
+      "credentials": [
+        {
+          "accessKey": "barter_access",
+          "secretKey": "barter_secret"
+        }
+      ],
+      "actions": [
+        "Admin",
+        "Read",
+        "Write",
+        "List",
+        "Tagging"
+      ]
+    }
+  ]
+}

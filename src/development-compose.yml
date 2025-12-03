@@ -1,0 +1,110 @@
+services:
+  database:
+    image: postgres:15
+    container_name: barter-database-dev
+    environment:
+      POSTGRES_DB: barter
+      POSTGRES_USER: barter_user
+      POSTGRES_PASSWORD: barter_password
+    ports:
+      - "5433:5432"
+    networks:
+      - barter-network
+    volumes:
+      - data:/var/lib/postgresql/data
+      - ./database/database-initializers:/docker-entrypoint-initdb.d
+    restart: unless-stopped
+
+  seaweed:
+    image: chrislusf/seaweedfs:latest
+    container_name: barter-seaweed-dev
+    command: "server -s3 -dir=/data -volume.max=0 -s3.config=/etc/seaweedfs/config.json"
+    ports:
+      - "8333:8333"   # S3 gateway
+      - "9333:9333"   # master
+      - "8080:8080"   # filer UI
+    volumes:
+      - seaweed_data:/data
+      - ./seaweed/config.json:/etc/seaweedfs/config.json
+    environment:
+      - WEED_S3_ACCESS_KEY=barter_access
+      - WEED_S3_SECRET_KEY=barter_secret
+    networks:
+      - barter-network
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -S --spider http://127.0.0.1:8333 2>&1 | grep -q 'HTTP/1.1 403'"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 30s
+
+    restart: unless-stopped
+
+  backend-migration:
+    build:
+      context: ./server
+      dockerfile: Dockerfile.dev
+    depends_on:
+      - database
+    environment:
+      DB_HOST: database
+      DB_PORT: 5432
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: Host=database;Port=5432;Username=barter_user;Password=barter_password;Database=barter
+    volumes:
+      - ./server/Migrations:/app/Migrations
+    networks:
+      - barter-network
+    command: >
+      sh -c "dotnet ef database update --project ./server.csproj --startup-project ./server.csproj" 
+    restart: no
+
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile.dev
+    depends_on:
+      backend-migration:
+        condition: service_started
+      seaweed:
+        condition: service_healthy
+    environment:
+      ServerSecret: serversecret123CHANGETHISLATER
+      DB_HOST: database
+      DB_PORT: 5432
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: Host=database;Port=5432;Username=barter_user;Password=barter_password;Database=barter
+    ports:
+      - "5172:80"
+    networks:
+      - barter-network
+    volumes:
+      - ./server/Migrations:/app/Migrations
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./view
+      dockerfile: Dockerfile.dev
+    working_dir: /app
+    networks:
+      - barter-network
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:5172
+      - CHOKIDAR_USEPOLLING=true     # helps Vite see changes on Windows/mac
+      - WATCHPACK_POLLING=true
+    volumes:
+      - ./view:/app                  # <-- mount source at /app (not /app/view)
+      - /app/node_modules            # <-- keep deps inside container (anonymous volume)
+    command: ["npm","run","dev","--","--host","0.0.0.0"]
+    restart: unless-stopped
+volumes:
+  data:
+  seaweed_data:
+networks:
+  barter-network: {}
+
+

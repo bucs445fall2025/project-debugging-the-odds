@@ -1,0 +1,39 @@
+services:
+  swag:
+    image: lscr.io/linuxserver/swag
+    container_name: swag
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=UTC
+      - URL=barteringservice.com
+      - SUBDOMAINS=www,
+      - VALIDATION=http
+      - EMAIL=barting.service@email.com
+    volumes:
+      - ./config/swag:/config
+    ports:
+      - "80:80"
+      - "443:443"
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__DefaultConnection: Host=your-rds-endpoint.amazonaws.com;Port=5432;Username=barter_user;Password=supersecret;Database=barter
+    expose:
+      - "80"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./view
+      dockerfile: Dockerfile
+    expose:
+      - "80"
+    restart: unless-stopped
+
+
