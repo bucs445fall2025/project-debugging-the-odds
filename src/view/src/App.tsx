@@ -12,7 +12,17 @@ export type AuthUser = {
 
 export default function App() {
   // null = not logged in
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(() => {
+  if (typeof window === 'undefined') return null;
+
+  const token = window.localStorage.getItem('auth_token');
+  const email = window.localStorage.getItem('auth_email');
+
+  if (token && email) {
+    return { email, token };
+  }
+  return null;
+});
   const [screen, setScreen] = useState<'floor' | 'pending'>('floor');
   const [pendingAlert, setPendingAlert] = useState(false);
 
@@ -52,26 +62,34 @@ export default function App() {
   }, [user]);
 
   if (!user) {
-    return (
-      <HomeScreen
-        onAuthenticated={(u) => {
-          // u = { email, token }
-          setUser(u);
-        }}
-      />
-    );
-  }
-
+	  return (
+	    <HomeScreen
+	      onAuthenticated={(u) => {
+		// u = { email, token }
+		setUser(u);
+		if (typeof window !== 'undefined') {
+		  window.localStorage.setItem('auth_token', u.token);
+		  window.localStorage.setItem('auth_email', u.email);
+		}
+	      }}
+	    />
+	  );
+	}
+ 
   if (screen === 'pending') {
     return (
       <PendingOffers
         user={user}
         onBack={() => setScreen('floor')}
-        onSignOut={() => {
-          setUser(null);
-          setScreen('floor');
-          setPendingAlert(false);
-        }}
+	onSignOut={() => {
+	  setUser(null);
+	  setScreen('floor');
+	  setPendingAlert(false);
+	  if (typeof window !== 'undefined') {
+	    window.localStorage.removeItem('auth_token');
+	    window.localStorage.removeItem('auth_email');
+	  }
+	}}
         onNotificationChange={setPendingAlert}
       />
     );
@@ -80,12 +98,16 @@ export default function App() {
   return (
     <TradingFloor
       user={user}
-      onSignOut={() => {
-        setUser(null);
-        setScreen('floor');
-        setPendingAlert(false);
-      }}
       onShowPending={() => setScreen('pending')}
+      onSignOut={() => {
+	  setUser(null);
+	  setScreen('floor');
+	  setPendingAlert(false);
+	  if (typeof window !== 'undefined') {
+	    window.localStorage.removeItem('auth_token');
+	    window.localStorage.removeItem('auth_email');
+	  }
+	}}
       pendingAlert={pendingAlert}
     />
   );
