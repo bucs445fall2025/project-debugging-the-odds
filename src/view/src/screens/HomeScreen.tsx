@@ -127,13 +127,18 @@ export default function HomeScreen({
             ]}
           >
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-              <LoginCard
-                cardW={cardW}
-                cardH={cardH}
-                onCreate={() => go('signup')}
-                onSubmit={handleSignIn}   // <-- will call onAuthenticated on success
-                onForgot={() => console.log('Forgot password')}
-              />
+		 <LoginCard
+		  cardW={cardW}
+		  cardH={cardH}
+		  onCreate={() => go('signup')}
+		  onSubmit={handleSignIn}   // email/password -> onAuthenticated
+		  onForgot={() => console.log('Forgot password')}
+		  onToken={(token, email) => {
+		    // Use email from Google if available, otherwise just something non-empty
+		    const effectiveEmail = email || 'google-user';
+		    onAuthenticated({ email: effectiveEmail, token });
+		  }}
+		/>
             </View>
           </Animated.View>
 

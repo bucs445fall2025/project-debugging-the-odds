@@ -17,6 +17,8 @@ using Amazon.S3;
 using Amazon.S3.Model;
 using System.Linq;
 using System.Collections.Generic;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+
 
 #region Constants
 //NEW: allow Vite dev (5173) to call the API
@@ -65,6 +67,36 @@ if ( !buckets.Any( buck => buck.BucketName == bucket ) ) await client.PutBucketA
 
 #endregion
 
+// Sessions
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromHours(12);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.None; 
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.IsEssential = true;
+});
+
+// JWT bearer
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = false,
+        ValidateAudience = false,
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("your_jwt_secret_key_here")),
+        ClockSkew = TimeSpan.Zero
+    };
+});
+builder.Services.AddAuthorization();
+
 var app = builder.Build();
 
 // enabling swagger for development environment only
@@ -75,6 +107,9 @@ if ( app.Environment.IsDevelopment() ) {
 
 //enable CORS before endpoints
 app.UseCors(CorsPolicy);
+app.UseSession();
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapGet( "/", () => "Hello World!" );
 
@@ -390,49 +425,130 @@ app.MapPost( "/authentication/sign/up", async ( [FromServices] Database database
   return Results.Ok( "Account created." );
 });
 
-app.MapPost( "/authentication/sign/in", async ( [FromServices] Database database, SignInRequest request ) => {
-  var user = await database.Users.SingleOrDefaultAsync( user => user.Email == request.Email );
-  if ( user is null ) return Results.BadRequest( "Invalid credentials user doesn't exist." );
 
-  var hash = Convert.ToBase64String( SHA256.HashData( Encoding.UTF8.GetBytes( request.Password + user.PasswordSalt ) ) );
-  if (hash != user.PasswordHash) return Results.BadRequest( "Invalid credentials hash." );
+app.MapPost("/authentication/google", async (
+    [FromServices] Database database,
+    [FromServices] IConfiguration config,
+    HttpRequest http,
+    HttpContext ctx
+) =>
+{
+    // Read the incoming body (either { idToken } or { code })
+    var payload = await JsonSerializer.DeserializeAsync<JsonElement>(http.Body);
 
-  string token = Library.JWTMethods.GenerateJwt( user.ID );
+    string? idToken = null;
 
-  return Results.Ok( new { token } );
-});
-
-// google oauthentication
-app.MapPost( "/authentication/google", async ( [FromServices] Database database, [FromServices] IConfiguration config, HttpRequest http ) => {
-    var json_payload = await JsonSerializer.DeserializeAsync<JsonElement>( http.Body );
-    if ( !json_payload.TryGetProperty( "idToken", out var id_token_element ) ) return Results.BadRequest( "Missing idToken." );
-
-    var id_token = id_token_element.GetString();
-    if ( string.IsNullOrWhiteSpace( id_token ) ) return Results.BadRequest("Missing idToken.");
-
-    var settings = new GoogleJsonWebSignature.ValidationSettings { Audience = new[] { config["Google:ClientId"] } };
-
-    GoogleJsonWebSignature.Payload google;
-    try {
-        google = await GoogleJsonWebSignature.ValidateAsync( id_token!, settings );
-    }
-    catch {
-        return Results.BadRequest( "Invalid Google token" );
+    // 1) Direct ID token from client (not used in your new code-client flow but kept for compatibility)
+    if (payload.TryGetProperty("idToken", out var idEl))
+    {
+        idToken = idEl.GetString();
     }
 
-    var email = google.Email;
-    var sub = google.Subject;
+    // 2) If ID token isn't provided, exchange "code" for tokens
+    if (string.IsNullOrWhiteSpace(idToken) && payload.TryGetProperty("code", out var codeEl))
+    {
+        var code = codeEl.GetString();
+        if (string.IsNullOrWhiteSpace(code))
+            return Results.BadRequest("Missing code.");
 
-    var user = await database.Users.SingleOrDefaultAsync( user => user.Email == email);
-    if ( user is null ) {
-        user = new User { ID = Guid.NewGuid(), Email = email };
-        database.Users.Add( user );
+        var clientId = config["Google:ClientId"];
+        var clientSecret = config["Google:ClientSecret"];
+
+        if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(clientSecret))
+            return Results.BadRequest("Server misconfigured: missing Google ClientId or ClientSecret.");
+
+        using var httpClient = new HttpClient();
+
+        var form = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["code"] = code!,
+            ["client_id"] = clientId!,
+            ["client_secret"] = clientSecret!,
+            ["redirect_uri"] = "postmessage",   // required for JS → backend code exchange
+            ["grant_type"] = "authorization_code",
+        });
+
+        var tokenResp = await httpClient.PostAsync("https://oauth2.googleapis.com/token", form);
+        if (!tokenResp.IsSuccessStatusCode)
+        {
+            var errBody = await tokenResp.Content.ReadAsStringAsync();
+            Console.WriteLine("Google token exchange failed: " + errBody);
+            return Results.BadRequest("Invalid Google token.");
+        }
+
+        var tokenJson = await tokenResp.Content.ReadFromJsonAsync<JsonElement>();
+        if (!tokenJson.TryGetProperty("id_token", out var idTokEl))
+            return Results.BadRequest("Google token exchange missing id_token.");
+
+        idToken = idTokEl.GetString();
+    }
+
+    // Still nothing?
+    if (string.IsNullOrWhiteSpace(idToken))
+        return Results.BadRequest("Missing idToken or code.");
+
+    // Validate the Google ID token
+    var settings = new GoogleJsonWebSignature.ValidationSettings
+    {
+        Audience = new[] { config["Google:ClientId"] }
+    };
+
+    GoogleJsonWebSignature.Payload googlePayload;
+    try
+    {
+        googlePayload = await GoogleJsonWebSignature.ValidateAsync(idToken!, settings);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine("Google ID token validation failed: " + ex);
+        return Results.BadRequest("Invalid Google token.");
+    }
+
+    // Google always returns an email for normal accounts
+    var email = googlePayload.Email;
+    if (string.IsNullOrWhiteSpace(email))
+        return Results.BadRequest("Google account did not provide an email.");
+
+    // Look for existing user
+    var user = await database.Users.SingleOrDefaultAsync(u => u.Email == email);
+
+    // If user doesn't exist → create a new OAuth user
+    if (user is null)
+    {
+        user = new User
+        {
+            ID = Guid.NewGuid(),
+            Email = email,
+
+            // OAuth-only user → no password, satisfy DB constraint
+            PasswordHash = null,
+            PasswordSalt = null,
+            OAuthProvider = "google",
+        };
+
+        database.Users.Add(user);
         await database.SaveChangesAsync();
     }
+    else
+    {
+        // Fix incomplete existing rows if needed (old rows before OAuthProvider existed)
+        if (user.PasswordHash == null && user.PasswordSalt == null && user.OAuthProvider == null)
+        {
+            user.OAuthProvider = "google";
+            await database.SaveChangesAsync();
+        }
+    }
 
-    string token = Library.JWTMethods.GenerateJwt( user.ID );
-    return Results.Ok( new { token } );
+    // Set session cookies for logged-in state
+    ctx.Session.SetString("UserId", user.ID.ToString());
+    ctx.Session.SetString("UserEmail", user.Email);
+
+    // Issue JWT
+    string token = Library.JWTMethods.GenerateJwt(user.ID);
+
+    return Results.Ok(new { token, email = user.Email });
 });
+
 
 // apple oauthentication
 app.MapPost( "/authentication/apple", async ( [FromServices] Database database, [FromServices] IConfiguration config, HttpRequest http ) => {

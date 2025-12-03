@@ -2,19 +2,19 @@ import React, { useState } from 'react';
 import { Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import TiltedCard from './TiltedCard';
 import { isValidEmail } from '@/utils/validation';
-
-// If you place a PNG at: src/assets/google.png
+import { googleSignin } from '@/api';
 import googleLogo from '@/assets/google.png';
-// If instead you use /public/google.svg on web, replace the Image's source with: { uri: '/google.svg' }
 
 export default function LoginCard({
-  cardW, cardH, onCreate, onSubmit, onForgot,
+  cardW, cardH, onCreate, onSubmit, onForgot, onToken,
 }: {
   cardW: number;
   cardH: number;
   onCreate: () => void;
   onSubmit: (email: string, password: string) => void;
   onForgot: () => void;
+  // NEW: let parent know “we have a token, treat as logged in”
+  onToken?: (token: string, email?: string) => void;
 }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -30,7 +30,64 @@ export default function LoginCard({
   };
 
   const onGoogle = () => {
-    console.log('OAuth Google clicked');
+    console.log('onGoogle clicked');
+
+    // Only for web
+    if (typeof window === 'undefined' || !(window as any).google) {
+      alert('Google Identity script not loaded — check index.html');
+      return;
+    }
+
+    const GOOGLE_CLIENT_ID =
+      '966595444731-3oldpfl3fhu37m2pj976v1ksq1jgd03j.apps.googleusercontent.com';
+
+    try {
+      const google = (window as any).google;
+
+      const client = google.accounts.oauth2.initCodeClient({
+        client_id: GOOGLE_CLIENT_ID,
+        scope: 'openid email profile',
+        ux_mode: 'popup',
+        callback: async (tokenResponse: any) => {
+          try {
+            console.log('Google code client response:', tokenResponse);
+
+            const code = tokenResponse?.code;
+            if (!code) {
+              console.error('No authorization code returned from Google:', tokenResponse);
+              alert('Google login failed (no auth code). See console for details.');
+              return;
+            }
+
+            const res = await googleSignin(code); // hits /authentication/google
+            console.log('googleSignin result:', res);
+
+            if (!res || !res.token) {
+              console.error('googleSignin returned unexpected response:', res);
+              alert('Google login failed on server. See console.');
+              return;
+            }
+
+            // ✅ Prefer to let the parent (HomeScreen) handle auth success
+            if (onToken) {
+              onToken(res.token, res.email);
+            } else {
+              // Fallback if nobody passed onToken
+              localStorage.setItem('auth_token', res.token);
+              window.location.reload();
+            }
+          } catch (e) {
+            console.error('Google login failed in callback:', e);
+            alert('Google login failed — see console for details.');
+          }
+        },
+      });
+
+      client.requestCode(); // opens popup
+    } catch (err) {
+      console.error('Error initializing Google OAuth code client', err);
+      alert('Failed to start Google sign-in.');
+    }
   };
 
   return (
@@ -63,20 +120,17 @@ export default function LoginCard({
         {error ? <Text style={styles.error}>{error}</Text> : null}
       </View>
 
-      {/* Primary sign in */}
       <View style={{ gap: 10 }}>
         <TouchableOpacity onPress={submit} style={styles.primaryBtn}>
           <Text style={styles.primaryBtnText}>Sign In</Text>
         </TouchableOpacity>
 
-        {/* Divider */}
         <View style={styles.dividerRow}>
           <View style={styles.divider} />
           <Text style={styles.dividerText}>or</Text>
           <View style={styles.divider} />
         </View>
 
-        {/* OAuth: Google (logo image) */}
         <TouchableOpacity
           onPress={onGoogle}
           style={styles.oauthBtn}
@@ -87,7 +141,6 @@ export default function LoginCard({
           <Text style={styles.oauthBtnText}>Sign in with Google</Text>
         </TouchableOpacity>
 
-        {/* Links */}
         <View style={styles.rowSplit}>
           <TouchableOpacity onPress={onCreate}>
             <Text style={styles.link}>Create account</Text>
@@ -133,3 +186,4 @@ const styles = StyleSheet.create({
   rowSplit: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
   link: { color: '#E7D9C6', textDecorationLine: 'underline' },
 });
+

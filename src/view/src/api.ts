@@ -52,6 +52,23 @@ export function signupNow(email: string, password: string) {
   return post<{ id?: string } | string>('/authentication/sign/up', { Email: email, Password: password });
 }
 
+// Google OAuth: send ID token to backend
+export async function googleSignin(code: string) {
+  const res = await fetch(`${RAW_BASE}/authentication/google`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ code }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || 'Google sign-in failed');
+  }
+
+  return res.json() as Promise<{ token: string; email?: string }>;
+}
+
 // -----------------------------
 // Items API (matches Program.cs)
 // -----------------------------
